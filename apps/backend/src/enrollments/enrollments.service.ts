@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Enrollment } from './enrollment.entity';
 import { PrerequisitesService } from '../courses/prerequisites.service';
+import { CourseVersioningService } from '../courses/course-versioning.service';
 
 @Injectable()
 export class EnrollmentsService {
@@ -12,6 +13,7 @@ export class EnrollmentsService {
     private repo: Repository<Enrollment>,
     private eventEmitter: EventEmitter2,
     private prereqService: PrerequisitesService,
+    private versioningService: CourseVersioningService,
   ) {}
 
   async enroll(userId: string, courseId: string, adminOverride = false): Promise<Enrollment> {
@@ -20,7 +22,17 @@ export class EnrollmentsService {
 
     await this.prereqService.enforcePrerequisites(userId, courseId, adminOverride);
 
-    const enrollment = await this.repo.save(this.repo.create({ userId, courseId }));
+    // Pin the student to the latest published version at enrollment time
+    const versions = await this.versioningService.listVersions(courseId);
+    const latestVersion = versions[0] ?? null;
+
+    const enrollment = await this.repo.save(
+      this.repo.create({
+        userId,
+        courseId,
+        enrolledVersionNumber: latestVersion?.versionNumber ?? null,
+      }),
+    );
 
     this.eventEmitter.emit('enrollment.created', {
       enrollmentId: enrollment.id,
@@ -44,5 +56,18 @@ export class EnrollmentsService {
       relations: ['course'],
       order: { enrolledAt: 'DESC' },
     });
+  }
+
+  /** Upgrade a student's pinned version to the latest available version. */
+  async upgradeVersion(userId: string, courseId: string): Promise<Enrollment> {
+    const enrollment = await this.repo.findOne({ where: { userId, courseId } });
+    if (!enrollment) throw new NotFoundException('Enrollment not found');
+
+    const versions = await this.versioningService.listVersions(courseId);
+    const latestVersion = versions[0];
+    if (!latestVersion) throw new NotFoundException('No versions found for this course');
+
+    enrollment.enrolledVersionNumber = latestVersion.versionNumber;
+    return this.repo.save(enrollment);
   }
 }

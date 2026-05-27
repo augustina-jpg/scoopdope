@@ -35,4 +35,8 @@ export class Enrollment {
 
   @Column({ nullable: true, type: 'timestamp' })
   completedAt: Date | null;
+
+  /** The course version number the student enrolled on. Null = pre-versioning. */
+  @Column({ nullable: true, type: 'int' })
+  enrolledVersionNumber: number | null;
 }

@@ -109,7 +109,7 @@ export function CertificateViewer({ certificate, isOpen, onClose }: CertificateV
 
           <div className="border-t pt-3">
             <a
-              href={`https://stellar.expert/explorer/testnet/tx/${certificate.txHash}`}
+              href={`https://stellar.expert/explorer/${process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'mainnet' ? 'public' : 'testnet'}/tx/${certificate.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-blue-600 dark:text-blue-400 hover:underline block text-center"

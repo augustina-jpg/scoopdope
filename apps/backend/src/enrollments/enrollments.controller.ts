@@ -57,4 +57,15 @@ export class EnrollmentsController {
   getUserEnrollments(@Param('id') userId: string) {
     return this.enrollmentsService.findByUser(userId);
   }
+
+  @Post('courses/:id/enroll/upgrade-version')
+  @ApiOperation({ summary: 'Upgrade enrollment to the latest course version' })
+  @ApiResponse({ status: 200, description: 'Enrollment upgraded to latest version' })
+  @ApiResponse({ status: 404, description: 'Enrollment or version not found' })
+  upgradeVersion(
+    @Param('id') courseId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.enrollmentsService.upgradeVersion(req.user.id, courseId);
+  }
 }
