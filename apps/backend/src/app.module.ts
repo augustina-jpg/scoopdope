@@ -36,6 +36,9 @@ import { AccessControlModule } from './access-control/access-control.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { UserRateLimitGuard } from './rate-limit/user-rate-limit.guard';
 import { AuditModule } from './audit/audit.module';
+import { DownloadsModule } from './downloads/downloads.module';
+import { QaModule } from './qa/qa.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 import * as redisStore from 'cache-manager-redis-store';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import configuration from './config/configuration';
@@ -122,6 +125,9 @@ import { validationSchema } from './config/validation.schema';
     AccessControlModule,
     RateLimitModule,
     AuditModule,
+    DownloadsModule,
+    QaModule,
+    AnnouncementsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
