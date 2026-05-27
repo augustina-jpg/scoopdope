@@ -45,4 +45,22 @@ export class PayoutsController {
   ) {
     return this.payoutsService.getPayoutHistory(instructorId, limit);
   }
+
+  @Get('instructor/:instructorId/monthly')
+  @UseGuards(JwtAuthGuard)
+  async getMonthlyRevenue(@Param('instructorId') instructorId: string) {
+    return this.payoutsService.getMonthlyRevenue(instructorId);
+  }
+
+  @Get('instructor/:instructorId/per-course')
+  @UseGuards(JwtAuthGuard)
+  async getPerCourseRevenue(@Param('instructorId') instructorId: string) {
+    return this.payoutsService.getPerCourseRevenue(instructorId);
+  }
+
+  @Get('instructor/:instructorId/projection')
+  @UseGuards(JwtAuthGuard)
+  async getRevenueProjection(@Param('instructorId') instructorId: string) {
+    return this.payoutsService.getRevenueProjection(instructorId);
+  }
 }
