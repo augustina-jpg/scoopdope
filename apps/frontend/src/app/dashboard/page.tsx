@@ -5,6 +5,8 @@ import { useAuth } from '@/lib/auth-context';
 import api from '@/lib/api';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CircularProgress } from '@/components/ui/CircularProgress';
+import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
+import { useOnboardingStore } from '@/store/onboarding.store';
 
 interface UserData {
   id: string;
@@ -139,6 +141,7 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
+      <OnboardingWizard />
       <main className="max-w-5xl mx-auto p-8 space-y-8">
         <section>
           {isLoading ? (

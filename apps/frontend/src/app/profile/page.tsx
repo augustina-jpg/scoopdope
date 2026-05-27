@@ -68,7 +68,17 @@ export default function ProfilePage() {
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{user.username}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{user.username}</h1>
+            {user.role === 'instructor' && (
+              <span
+                title="Verified Instructor"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+              >
+                ✓ Verified Instructor
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 dark:text-gray-400 text-sm">
             {user.email} · {user.role} · Joined {new Date(user.createdAt).toLocaleDateString()}
           </p>

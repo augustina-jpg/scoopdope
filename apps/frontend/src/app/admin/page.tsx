@@ -4,13 +4,15 @@ import { StatsCards } from '@/components/admin/StatsCards';
 import { UserTable } from '@/components/admin/UserTable';
 import { CourseApprovalList } from '@/components/admin/CourseApprovalList';
 import { SystemHealth } from '@/components/admin/SystemHealth';
+import { InstructorApplicationsList } from '@/components/admin/InstructorApplicationsList';
 
-type AdminTab = 'stats' | 'users' | 'courses' | 'health';
+type AdminTab = 'stats' | 'users' | 'courses' | 'instructors' | 'health';
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: 'stats', label: 'Statistics' },
   { value: 'users', label: 'Users' },
   { value: 'courses', label: 'Course Approvals' },
+  { value: 'instructors', label: 'Instructor Applications' },
   { value: 'health', label: 'System Health' },
 ];
 
@@ -36,6 +38,7 @@ export default function AdminPage() {
       {tab === 'stats' && <StatsCards />}
       {tab === 'users' && <UserTable />}
       {tab === 'courses' && <CourseApprovalList />}
+      {tab === 'instructors' && <InstructorApplicationsList />}
       {tab === 'health' && <SystemHealth />}
     </main>
   );
