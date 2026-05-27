@@ -117,4 +117,57 @@ export class PayoutsService {
       take: limit,
     });
   }
+
+  async getMonthlyRevenue(instructorId: string): Promise<{ month: string; revenue: number }[]> {
+    const payouts = await this.payoutsRepository.find({
+      where: { instructorId, status: 'processed' },
+      order: { payoutDate: 'ASC' },
+    });
+
+    const byMonth: Record<string, number> = {};
+    for (const p of payouts) {
+      const key = p.payoutDate.toISOString().slice(0, 7); // YYYY-MM
+      byMonth[key] = (byMonth[key] ?? 0) + Number(p.instructorShare);
+    }
+
+    return Object.entries(byMonth).map(([month, revenue]) => ({ month, revenue }));
+  }
+
+  async getPerCourseRevenue(
+    instructorId: string,
+  ): Promise<{ courseId: string; courseTitle: string; revenue: number; payoutCount: number }[]> {
+    const payouts = await this.payoutsRepository.find({
+      where: { instructorId },
+      relations: ['course'],
+    });
+
+    const byCourse: Record<string, { courseTitle: string; revenue: number; payoutCount: number }> = {};
+    for (const p of payouts) {
+      if (!byCourse[p.courseId]) {
+        byCourse[p.courseId] = { courseTitle: p.course?.title ?? p.courseId, revenue: 0, payoutCount: 0 };
+      }
+      byCourse[p.courseId].revenue += Number(p.instructorShare);
+      byCourse[p.courseId].payoutCount += 1;
+    }
+
+    return Object.entries(byCourse).map(([courseId, data]) => ({ courseId, ...data }));
+  }
+
+  async getRevenueProjection(instructorId: string): Promise<{ projectedMonthly: number; trend: 'up' | 'down' | 'stable' }> {
+    const monthly = await this.getMonthlyRevenue(instructorId);
+    if (monthly.length < 2) {
+      return { projectedMonthly: monthly[0]?.revenue ?? 0, trend: 'stable' };
+    }
+
+    const last = monthly[monthly.length - 1].revenue;
+    const prev = monthly[monthly.length - 2].revenue;
+    const trend: 'up' | 'down' | 'stable' =
+      last > prev * 1.05 ? 'up' : last < prev * 0.95 ? 'down' : 'stable';
+
+    // Simple linear projection: average growth applied to last month
+    const avgGrowth = monthly.slice(1).reduce((sum, m, i) => sum + (m.revenue - monthly[i].revenue), 0) / (monthly.length - 1);
+    const projectedMonthly = Math.max(0, last + avgGrowth);
+
+    return { projectedMonthly: Math.round(projectedMonthly * 100) / 100, trend };
+  }
 }
