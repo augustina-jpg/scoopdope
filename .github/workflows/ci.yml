@@ -305,12 +305,37 @@ jobs:
       - name: Set up k6
         uses: grafana/setup-k6-action@v1
 
-      - name: Run load tests
-        run: |
-          ./scripts/load-test.sh
+      - name: Run auth load test
+        run: k6 run --out json=results-auth.json scripts/load-tests/auth-login.js
         env:
-          API_URL: http://localhost:3000
+          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
         continue-on-error: true
+
+      - name: Run courses load test
+        run: k6 run --out json=results-courses.json scripts/load-tests/courses.js
+        env:
+          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
+        continue-on-error: true
+
+      - name: Run enrollment load test
+        run: k6 run --out json=results-enrollment.json scripts/load-tests/enrollment.js
+        env:
+          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
+        continue-on-error: true
+
+      - name: Run video streaming load test
+        run: k6 run --out json=results-video.json scripts/load-tests/video-streaming.js
+        env:
+          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
+        continue-on-error: true
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-load-test-results
+          path: results-*.json
+          retention-days: 30
 
   sonarcloud:
     name: Code Quality - SonarCloud

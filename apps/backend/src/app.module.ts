@@ -39,6 +39,7 @@ import { AuditModule } from './audit/audit.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { PayoutsModule } from './payouts/payouts.module';
+import { InstructorApplicationsModule } from './instructor-applications/instructor-applications.module';
 import * as redisStore from 'cache-manager-redis-store';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import configuration from './config/configuration';
@@ -107,6 +108,7 @@ import { validationSchema } from './config/validation.schema';
     RemindersModule,
     CertificatesModule,
     PayoutsModule,
+    InstructorApplicationsModule,
     HealthModule,
     MetricsModule,
     KycModule,
