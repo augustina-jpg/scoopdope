@@ -7,8 +7,10 @@ import { QAPanel } from '@/components/courses/QAPanel';
 import { AnnouncementsPanel } from '@/components/courses/AnnouncementsPanel';
 import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompareStore } from '@/store/compare.store';
 import api from '@/lib/api';
-import { PlayCircle } from 'lucide-react';
+import { toast } from '@/lib/toast';
+import { PlayCircle, Lock, Calendar } from 'lucide-react';
 
 interface CourseDetailPageProps {
   params: { id: string };
@@ -18,10 +20,25 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const [tab, setTab] = useState<'overview' | 'curriculum' | 'reviews' | 'qa' | 'announcements' | 'assignments'>('overview');
   const [reviewsKey, setReviewsKey] = useState(0);
   const [modules, setModules] = useState<any[]>([]);
+  const [enrolling, setEnrolling] = useState(false);
   const { user } = useAuth();
+  const { clear: clearCompare } = useCompareStore();
 
   const courseId = params.id;
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
+
+  const handleEnroll = async () => {
+    setEnrolling(true);
+    try {
+      await api.post('/v1/enrollments', { courseId });
+      clearCompare();
+      toast.success('Enrolled successfully!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message ?? 'Enrollment failed');
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -68,6 +85,15 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       {tab === 'overview' && (
         <div className="space-y-4">
           <p className="text-gray-600">Course content and details would appear here.</p>
+          {!isInstructor && (
+            <button
+              onClick={handleEnroll}
+              disabled={enrolling}
+              className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2.5 font-medium text-sm transition-colors"
+            >
+              {enrolling ? 'Enrolling…' : 'Enroll Now'}
+            </button>
+          )}
           <ReviewForm courseId={courseId} onSuccess={() => { setTab('reviews'); setReviewsKey((k) => k + 1); }} />
         </div>
       )}
