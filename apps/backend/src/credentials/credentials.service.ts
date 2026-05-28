@@ -82,7 +82,21 @@ export class CredentialsService {
     return this.repo.save(credential);
   }
 
-  findByUser(userId: string) {
+  async issueLearningPath(userId: string, learningPathId: string, stellarPublicKey: string): Promise<Credential> {
+    const existing = await this.repo.findOne({ where: { userId, learningPathId } });
+    if (existing) return existing;
+
+    const txHash = await this.stellarService.issueCredential(stellarPublicKey, `learning-path:${learningPathId}`);
+
+    try {
+      await this.stellarService.mintReward(stellarPublicKey, 750);
+    } catch {
+      // Non-fatal
+    }
+
+    const credential = this.repo.create({ userId, learningPathId, txHash, stellarPublicKey });
+    return this.repo.save(credential);
+  }  findByUser(userId: string) {
     return this.repo.find({ where: { userId }, order: { issuedAt: 'DESC' } });
   }
 

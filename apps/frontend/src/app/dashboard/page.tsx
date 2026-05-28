@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const [courses, setCourses] = useState<Record<string, CourseData>>({});
   const [credentials, setCredentials] = useState<CredentialRecord[]>([]);
   const [bundleEnrollments, setBundleEnrollments] = useState<any[]>([]);
+  const [pathEnrollments, setPathEnrollments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,15 +89,17 @@ export default function DashboardPage() {
           throw new Error('User information is missing.');
         }
 
-        const [balanceRes, progressRes, credRes, bundlesRes] = await Promise.all([
+        const [balanceRes, progressRes, credRes, bundlesRes, pathsRes] = await Promise.all([
           api.get(`/users/${currentUser.id}/token-balance`),
           api.get(`/users/${currentUser.id}/progress`),
           api.get(`/credentials/${currentUser.id}`),
           api.get('/bundles/user/me'),
+          api.get('/learning-paths/user/me'),
         ]);
 
         setTokenBalance(Number(balanceRes.data.balance ?? 0));
         setBundleEnrollments(bundlesRes.data ?? []);
+        setPathEnrollments(pathsRes.data ?? []);
 
         const progressRecords: ProgressRecord[] = (progressRes.data ?? []).map((p: any) => ({
           id: p.id,
@@ -232,6 +235,38 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {pathEnrollments.length > 0 && (
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+              Learning Paths
+            </h2>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pathEnrollments.map((enrollment: any) => {
+                const lp = enrollment.learningPath;
+                const total = lp?.courses?.length ?? 0;
+                return (
+                  <div
+                    key={enrollment.id}
+                    className="p-4 rounded-lg border border-purple-100 dark:border-purple-900/30 bg-purple-50/30 dark:bg-purple-900/10"
+                  >
+                    <h3 className="font-bold text-gray-900 dark:text-white">{lp?.title}</h3>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">{total} Courses</span>
+                      {enrollment.completedAt ? (
+                        <span className="text-green-600 font-bold flex items-center">
+                          <CheckCircle2 className="w-4 h-4 mr-1" /> Completed
+                        </span>
+                      ) : (
+                        <span className="text-purple-600 font-bold">In Progress</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

@@ -9,6 +9,7 @@ import {
 import { User } from '../users/user.entity';
 import { Course } from '../courses/course.entity';
 import { Bundle } from '../bundles/bundle.entity';
+import { LearningPath } from '../learning-paths/learning-path.entity';
 
 @Entity('credentials')
 export class Credential {
@@ -35,6 +36,13 @@ export class Credential {
   @ManyToOne(() => Bundle, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'bundleId' })
   bundle: Bundle;
+
+  @Column({ nullable: true })
+  learningPathId: string;
+
+  @ManyToOne(() => LearningPath, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'learningPathId' })
+  learningPath: LearningPath;
 
   @Column({ nullable: true })
   txHash: string;
