@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { TranscriptDisplay } from '@/components/courses/TranscriptDisplay';
-import { ChevronLeft, ChevronRight, Layout, CheckCircle } from 'lucide-react';
+import { NotesPanel } from '@/components/courses/NotesPanel';
+import { ChevronLeft, ChevronRight, Layout, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useVideoShortcuts } from '@/hooks/useVideoShortcuts';
 import { useSyncProgress } from '@/hooks/useSyncProgress';
@@ -12,13 +13,13 @@ import { useSyncProgress } from '@/hooks/useSyncProgress';
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
-  const courseId = params?.id as string;
-  const lessonId = params?.lessonId as string;
-  
+  const courseId = params?.id;
+  const lessonId = params?.lessonId;
+
   const [lesson, setLesson] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isCompleting, setIsCompleting] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'transcript' | 'notes'>('transcript');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const { recordProgress } = useSyncProgress();
@@ -27,24 +28,14 @@ export default function LessonPage() {
 
   useEffect(() => {
     if (!lessonId) return;
-    
-    const fetchLesson = async () => {
-      try {
-        const { data } = await api.get(`/lessons/${lessonId}`);
-        setLesson(data);
-      } catch (error) {
-        console.error('Failed to fetch lesson:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLesson();
+    api.get(`/lessons/${lessonId}`)
+      .then(({ data }) => setLesson(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [lessonId]);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
+    if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
   const handleSeek = (time: number) => {
@@ -82,35 +73,16 @@ export default function LessonPage() {
           <h1 className="text-lg font-bold">{lesson.title}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant={lesson.completed ? 'success' : 'primary'}
-            size="sm"
-            onClick={handleComplete}
-            disabled={isCompleting || lesson.completed}
-          >
-            {lesson.completed ? (
-              <>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Completed
-              </>
-            ) : (
-              'Mark as Complete'
-            )}
-          </Button>
-          <Button variant="outline" size="sm">
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          <Button variant="outline" size="sm"><ChevronLeft className="w-4 h-4" /></Button>
+          <Button variant="outline" size="sm"><ChevronRight className="w-4 h-4" /></Button>
         </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Main Content (Video) */}
+        {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-8">
           <div className="max-w-5xl mx-auto space-y-6">
-            <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
+            <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl">
               {lesson.videoUrl ? (
                 <video
                   ref={videoRef}
@@ -126,7 +98,6 @@ export default function LessonPage() {
                 </div>
               )}
             </div>
-
             <div className="space-y-4">
               <h2 className="text-2xl font-bold">About this lesson</h2>
               <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
@@ -136,18 +107,47 @@ export default function LessonPage() {
           </div>
         </div>
 
-        {/* Sidebar (Transcript) */}
+        {/* Sidebar */}
         <aside className="w-full lg:w-96 bg-white dark:bg-gray-900 border-t lg:border-t-0 lg:border-l dark:border-gray-800 flex flex-col h-[50vh] lg:h-auto">
-          <div className="p-4 border-b dark:border-gray-800 flex items-center gap-2">
-            <Layout className="w-4 h-4 text-blue-500" />
-            <h3 className="font-semibold">Transcript</h3>
+          {/* Tab bar */}
+          <div className="flex border-b dark:border-gray-800">
+            <button
+              onClick={() => setSidebarTab('transcript')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                sidebarTab === 'transcript'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <Layout className="w-4 h-4" /> Transcript
+            </button>
+            <button
+              onClick={() => setSidebarTab('notes')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                sidebarTab === 'notes'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" /> Notes
+            </button>
           </div>
+
           <div className="flex-1 overflow-hidden">
-            <TranscriptDisplay
-              lessonId={lessonId as string}
-              currentTime={currentTime}
-              onSeek={handleSeek}
-            />
+            {sidebarTab === 'transcript' ? (
+              <TranscriptDisplay
+                lessonId={lessonId as string}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+              />
+            ) : (
+              <NotesPanel
+                lessonId={lessonId as string}
+                lessonTitle={lesson.title}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+              />
+            )}
           </div>
         </aside>
       </div>
