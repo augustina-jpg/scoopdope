@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import WalletSection from './WalletSection';
 import ReferralSection from './ReferralSection';
+import { NotificationSettings } from '@/components/profile/NotificationSettings';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useBookmarksStore } from '@/store/bookmarks.store';
 
@@ -310,6 +311,9 @@ export default function ProfilePage() {
 
         {/* Referral Section */}
         {user.referralCode && <ReferralSection userId={user.id} referralCode={user.referralCode} />}
+
+        {/* Notification Settings */}
+        <NotificationSettings />
       </main>
     </ProtectedRoute>
   );

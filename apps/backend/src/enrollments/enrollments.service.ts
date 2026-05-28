@@ -48,6 +48,9 @@ export class EnrollmentsService {
     const enrollment = await this.repo.findOne({ where: { userId, courseId } });
     if (!enrollment) throw new NotFoundException('Enrollment not found');
     await this.repo.remove(enrollment);
+
+    // Notify waitlist system that a spot has opened
+    this.eventEmitter.emit('enrollment.removed', { userId, courseId });
   }
 
   findByUser(userId: string): Promise<Enrollment[]> {

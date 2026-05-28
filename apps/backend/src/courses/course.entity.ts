@@ -57,6 +57,10 @@ export class Course {
   @Column({ nullable: true })
   thumbnailUrl: string;
 
+  /** Base price in USD; null or 0 means free */
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, default: null })
+  priceUsd: number | null;
+
   @Column({ type: 'jsonb', nullable: true })
   skills: string[];
 
@@ -65,6 +69,13 @@ export class Course {
 
   @Column({ nullable: true, type: 'timestamptz' })
   publishedAt: Date | null;
+
+  /**
+   * Maximum number of students that can be enrolled simultaneously.
+   * Null means unlimited.
+   */
+  @Column({ nullable: true, type: 'int' })
+  maxEnrollment: number | null;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'instructorId' })

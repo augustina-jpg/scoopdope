@@ -8,6 +8,8 @@ export enum NotificationType {
   QA_QUESTION = 'qa_question',
   QA_ANSWER = 'qa_answer',
   ANNOUNCEMENT = 'announcement',
+  WAITLIST_JOINED = 'waitlist_joined',
+  WAITLIST_ENROLLED = 'waitlist_enrolled',
 }
 
 @Entity('notifications')

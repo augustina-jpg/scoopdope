@@ -87,6 +87,22 @@ export class User {
   @Column({ nullable: true, type: 'datetime' })
   subscriptionExpiresAt: Date | null;
 
+  @Column('simple-json', {
+    nullable: true,
+    default: {
+      courseUpdates: true,
+      liveSessions: true,
+      tokenRewards: true,
+      pushEnabled: false,
+    },
+  })
+  notificationPreferences: {
+    courseUpdates: boolean;
+    liveSessions: boolean;
+    tokenRewards: boolean;
+    pushEnabled: boolean;
+  };
+
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -6,6 +6,7 @@ import { ReviewList } from '@/components/reviews/ReviewList';
 import { QAPanel } from '@/components/courses/QAPanel';
 import { AnnouncementsPanel } from '@/components/courses/AnnouncementsPanel';
 import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
+import { WaitlistButton } from '@/components/courses/WaitlistButton';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompareStore } from '@/store/compare.store';
 import api from '@/lib/api';
@@ -14,6 +15,15 @@ import { PlayCircle, Lock, Calendar } from 'lucide-react';
 
 interface CourseDetailPageProps {
   params: { id: string };
+}
+
+interface CourseData {
+  id: string;
+  title: string;
+  description: string;
+  maxEnrollment: number | null;
+  enrollmentCount?: number;
+  isPublished: boolean;
 }
 
 export default function CourseDetailPage({ params }: CourseDetailPageProps) {
@@ -41,6 +51,28 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   };
 
   useEffect(() => {
+    async function fetchCourse() {
+      try {
+        const { data } = await api.get(`/courses/${courseId}`);
+        setCourse(data);
+      } catch {
+        // course data unavailable
+      }
+    }
+
+    async function fetchEnrollmentStatus() {
+      if (!user) return;
+      try {
+        const { data } = await api.get(`/users/${user.id}/enrollments`);
+        const enrolled = Array.isArray(data)
+          ? data.some((e: any) => e.courseId === courseId)
+          : false;
+        setIsEnrolled(enrolled);
+      } catch {
+        // not enrolled or unauthenticated
+      }
+    }
+
     const fetchModules = async () => {
       try {
         const { data } = await api.get(`/courses/${courseId}/modules`);
@@ -55,15 +87,85 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         console.error('Failed to fetch course curriculum:', error);
       }
     };
+
+    fetchCourse();
+    fetchEnrollmentStatus();
     fetchModules();
-  }, [courseId]);
+  }, [courseId, user]);
+
+  async function handleEnroll() {
+    setEnrolling(true);
+    setEnrollError(null);
+    try {
+      await api.post(`/courses/${courseId}/enroll`);
+      setIsEnrolled(true);
+    } catch (err: any) {
+      const msg: string =
+        err?.response?.data?.message ?? 'Enrollment failed. Please try again.';
+      setEnrollError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    } finally {
+      setEnrolling(false);
+    }
+  }
 
   return (
     <main className="max-w-4xl mx-auto p-8">
       <Link href="/courses" className="text-blue-600 hover:underline text-sm mb-4 inline-block">
         ← Back to Courses
       </Link>
-      <h1 className="text-3xl font-bold mb-2">Course {courseId}</h1>
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <h1 className="text-3xl font-bold">{course?.title ?? `Course ${courseId}`}</h1>
+
+        {/* Enrollment / Waitlist actions */}
+        {user && !isInstructor && (
+          <div className="shrink-0 w-48 space-y-2">
+            {isEnrolled ? (
+              <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-2 text-center">
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">Enrolled ✓</p>
+              </div>
+            ) : isFull ? (
+              <WaitlistButton
+                courseId={courseId}
+                isFull={isFull}
+                isEnrolled={isEnrolled}
+                onEnrolled={() => setIsEnrolled(true)}
+              />
+            ) : (
+              <div className="space-y-1">
+                <button
+                  onClick={handleEnroll}
+                  disabled={enrolling}
+                  className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Enroll in this course"
+                >
+                  {enrolling ? 'Enrolling…' : 'Enroll Now'}
+                </button>
+                {enrollError && (
+                  <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                    {enrollError}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {course?.description && (
+        <p className="text-gray-600 dark:text-gray-400 mb-2">{course.description}</p>
+      )}
+
+      {course?.maxEnrollment != null && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          {course.enrollmentCount ?? 0} / {course.maxEnrollment} spots filled
+          {isFull && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+              Full
+            </span>
+          )}
+        </p>
+      )}
+
       <Link href={`/courses/${courseId}/forum`} className="text-blue-600 hover:underline text-sm mb-6 inline-block">
         View Discussion Forum →
       </Link>
