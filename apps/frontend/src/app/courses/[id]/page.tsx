@@ -5,6 +5,7 @@ import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { ReviewList } from '@/components/reviews/ReviewList';
 import { QAPanel } from '@/components/courses/QAPanel';
 import { AnnouncementsPanel } from '@/components/courses/AnnouncementsPanel';
+import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
 import { useAuth } from '@/hooks/useAuth';
 
 interface CourseDetailPageProps {
@@ -12,7 +13,7 @@ interface CourseDetailPageProps {
 }
 
 export default function CourseDetailPage({ params }: CourseDetailPageProps) {
-  const [tab, setTab] = useState<'overview' | 'reviews' | 'qa' | 'announcements'>('overview');
+  const [tab, setTab] = useState<'overview' | 'reviews' | 'qa' | 'announcements' | 'assignments'>('overview');
   const [reviewsKey, setReviewsKey] = useState(0);
   const { user } = useAuth();
 
@@ -29,11 +30,11 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         View Discussion Forum →
       </Link>
 
-      <div className="flex gap-4 border-b mb-6">
-        {(['overview', 'reviews', 'qa', 'announcements'] as const).map((t) => (
+      <div className="flex gap-4 border-b mb-6 overflow-x-auto">
+        {(['overview', 'reviews', 'qa', 'announcements', 'assignments'] as const).map((t) => (
           <button
             key={t}
-            className={`pb-2 px-1 capitalize text-sm font-medium border-b-2 transition-colors ${
+            className={`pb-2 px-1 capitalize text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
             onClick={() => setTab(t)}
@@ -65,99 +66,10 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       {tab === 'announcements' && (
         <AnnouncementsPanel courseId={courseId} isInstructor={isInstructor} />
       )}
-    </main>
-  );
-}
-import type { Metadata } from 'next';
-import Link from 'next/link';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://brain-storm.app';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  level: string;
-  durationHours: number;
-}
-
-async function getCourse(id: string): Promise<Course | null> {
-  try {
-    const res = await fetch(`${API_URL}/courses/${id}`, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    // handle both { data: course } and bare course shapes
-    return json?.data ?? json;
-  } catch {
-    return null;
-  }
-}
-
-// ── generateMetadata ──────────────────────────────────────────────────────────
-
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const course = await getCourse(params.id);
-
-  if (!course) {
-    return {
-      title: 'Course Not Found | Brain-Storm',
-      robots: { index: false },
-    };
-  }
-
-  const title = `${course.title} | Brain-Storm`;
-  const description =
-    course.description?.slice(0, 160) || 'Learn blockchain development on Stellar.';
-  const canonical = `${SITE_URL}/courses/${course.id}`;
-
-  return {
-    title,
-    description,
-    alternates: {
-      canonical,
-    },
-    openGraph: {
-      title,
-      description,
-      url: canonical,
-      siteName: 'Brain-Storm',
-      type: 'article',
-    },
-    twitter: {
-      card: 'summary',
-      title,
-      description,
-    },
-  };
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-
-export default async function CourseDetailPage({ params }: { params: { id: string } }) {
-  const course = await getCourse(params.id);
-
-  if (!course) {
-    return (
-      <main className="max-w-3xl mx-auto p-8 text-center">
-        <p className="text-gray-500">Course not found.</p>
-        <Link href="/courses" className="mt-4 inline-block text-blue-600 hover:underline">
-          ← Back to Courses
-        </Link>
-      </main>
-    );
-  }
-
-  return (
-    <main className="max-w-3xl mx-auto p-8 space-y-4">
-      <Link href="/courses" className="text-sm text-blue-600 hover:underline">
-        ← Back to Courses
-      </Link>
-      <h1 className="text-3xl font-bold">{course.title}</h1>
-      <p className="text-gray-500 text-sm">
-        {course.level} · {course.durationHours}h
-      </p>
-      <p className="text-gray-700 leading-relaxed">{course.description}</p>
+      {tab === 'assignments' && (
+        <AssignmentsTab courseId={courseId} />
+      )}
     </main>
   );
 }
