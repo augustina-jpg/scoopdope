@@ -10,6 +10,7 @@ import {
 import { CourseModule } from './course-module.entity';
 import { User } from '../users/user.entity';
 import { Review } from './review.entity';
+import { CoursePrerequisite } from './course-prerequisite.entity';
 
 export enum CourseStatus {
   DRAFT = 'draft',
@@ -86,6 +87,9 @@ export class Course {
 
   @OneToMany(() => Review, (review) => review.course)
   reviews: Review[];
+
+  @OneToMany(() => CoursePrerequisite, (cp) => cp.course)
+  prerequisites: CoursePrerequisite[];
 
   averageRating?: number | null;
 

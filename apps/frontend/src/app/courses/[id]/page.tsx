@@ -187,6 +187,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       {tab === 'overview' && (
         <div className="space-y-4">
           <p className="text-gray-600">Course content and details would appear here.</p>
+          {!isInstructor && <PrerequisitesPanel courseId={courseId} />}
           {!isInstructor && (
             <button
               onClick={handleEnroll}

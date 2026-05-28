@@ -89,7 +89,10 @@ export class CoursesService {
   }
 
   async findOne(id: string): Promise<Course> {
-    const course = await this.repo.findOne({ where: { id, isDeleted: false } });
+    const course = await this.repo.findOne({
+      where: { id, isDeleted: false },
+      relations: ['prerequisites', 'prerequisites.prerequisite'],
+    });
     if (!course) throw new NotFoundException('Course not found');
     return course;
   }

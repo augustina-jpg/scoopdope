@@ -37,6 +37,19 @@ export class EnrollmentsController {
     return this.enrollmentsService.enroll(req.user.id, courseId, isAdmin && !!adminOverride);
   }
 
+  @Post('enrollments')
+  @ApiOperation({ summary: 'Enroll the current user in a course (by body courseId)' })
+  @ApiResponse({ status: 201, description: 'Enrolled successfully' })
+  @ApiResponse({ status: 403, description: 'Prerequisites not completed' })
+  @ApiResponse({ status: 409, description: 'Already enrolled' })
+  enrollByBody(
+    @Body('courseId') courseId: string,
+    @Request() req: { user: { id: string; role: string } },
+  ) {
+    const isAdmin = req.user.role === 'admin';
+    return this.enrollmentsService.enroll(req.user.id, courseId, false);
+  }
+
   @Delete('courses/:id/enroll')
   @ApiOperation({ summary: 'Unenroll the current user from a course' })
   @ApiResponse({ status: 200, description: 'Unenrolled successfully' })

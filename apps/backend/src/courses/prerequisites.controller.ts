@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -24,6 +24,16 @@ export class PrerequisitesController {
   @ApiOperation({ summary: 'Get full prerequisite chain for visualization' })
   getChain(@Param('courseId') courseId: string) {
     return this.prereqService.getPrerequisiteChain(courseId);
+  }
+
+  @Get('status')
+  @Roles('admin', 'instructor', 'student')
+  @ApiOperation({ summary: 'Get prerequisite completion status for the current user' })
+  getStatus(
+    @Param('courseId') courseId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.prereqService.getPrerequisiteStatus(courseId, req.user.id);
   }
 
   @Post()
