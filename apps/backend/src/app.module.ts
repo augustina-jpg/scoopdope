@@ -39,6 +39,7 @@ import { UserRateLimitGuard } from './rate-limit/user-rate-limit.guard';
 import { AuditModule } from './audit/audit.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { CertificatesModule } from './certificates/certificates.module';
+import { ApiVersionModule } from './common/versioning';
 import { PayoutsModule } from './payouts/payouts.module';
 import { InstructorApplicationsModule } from './instructor-applications/instructor-applications.module';
 import { AssignmentsModule } from './assignments/assignments.module';
@@ -144,6 +145,7 @@ import { validationSchema } from './config/validation.schema';
     SubscriptionsModule,
     LiveSessionsModule,
     PaymentsModule,
+    ApiVersionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

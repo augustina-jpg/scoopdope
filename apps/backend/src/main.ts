@@ -14,6 +14,14 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { MetricsInterceptor } from './metrics/metrics.interceptor';
 import { MetricsService } from './metrics/metrics.service';
+import {
+  API_VERSIONS,
+  DEFAULT_API_VERSION,
+  LATEST_API_VERSION,
+  API_VERSION_HEADER,
+  VERSION_MANIFEST,
+  getVersionInfo,
+} from './common/versioning';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -45,10 +53,27 @@ async function bootstrap() {
     maxAge: corsPreflight,
   });
 
+  const v1Info = getVersionInfo('v1');
+
   const config = new DocumentBuilder()
     .setTitle('scoopdope API')
     .setDescription(
       'Blockchain education platform API powered by Stellar\n\n' +
+        '## API Versioning\n\n' +
+        'This API uses **URL-based versioning**. All requests must include the version prefix.\n\n' +
+        `Current version: **${LATEST_API_VERSION}** | Supported: ${API_VERSIONS.join(', ')}\n\n` +
+        '### Version Headers\n\n' +
+        '| Header | Description |\n' +
+        '|--------|-------------|\n' +
+        `| \`${API_VERSION_HEADER}\` | Request a specific version (e.g., \`v1\`) |\n` +
+        '| `X-API-Version` | Response header indicating the served version |\n' +
+        '| `X-API-Deprecated` | Response header warning about deprecation |\n' +
+        '| `X-API-Sunset` | Response header with sunset date for deprecated versions |\n\n' +
+        '### Versioning Policy\n\n' +
+        '- Backward-compatible changes (new fields, new endpoints) are additive within a version\n' +
+        '- Breaking changes trigger a new version (e.g., v2)\n' +
+        '- Deprecated versions receive a 90-day sunset window before removal\n' +
+        '- Clients should check `X-API-Version` and `X-API-Deprecated` response headers\n\n' +
         '## Authentication\n\n' +
         'This API uses JWT Bearer tokens for authentication.\n\n' +
         '### Getting Started\n\n' +
@@ -82,7 +107,8 @@ async function bootstrap() {
       'JWT-auth'
     )
     .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-KEY' }, 'X-API-KEY')
-    .addServer('/v1', 'API v1')
+    .addServer(`/${LATEST_API_VERSION}`, `API ${LATEST_API_VERSION} (latest)`)
+    .addServer(`/${DEFAULT_API_VERSION}`, `API ${DEFAULT_API_VERSION} (default)`)
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
