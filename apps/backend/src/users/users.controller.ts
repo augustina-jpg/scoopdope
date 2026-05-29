@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Param,
   Query,
   Patch,
@@ -18,6 +19,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { StellarService } from '../stellar/stellar.service';
+import { AuditService } from '../audit/audit.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -25,7 +27,8 @@ import { StellarService } from '../stellar/stellar.service';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly stellarService: StellarService
+    private readonly stellarService: StellarService,
+    private readonly auditService: AuditService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -91,6 +94,26 @@ export class UsersController {
       throw new ForbiddenException('You can only update your own profile');
     }
     return this.usersService.update(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/export')
+  @ApiOperation({ summary: 'Export all personal data (GDPR)' })
+  @ApiResponse({ status: 200, description: 'Returns all user data in JSON format' })
+  async exportData(@Request() req: { user: { id: string } }) {
+    const data = await this.usersService.exportUserData(req.user.id);
+    await this.auditService.log('gdpr.data_export', req.user.id, true);
+    return data;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('me/account')
+  @ApiOperation({ summary: 'Delete account and anonymize personal data (GDPR)' })
+  @ApiResponse({ status: 200, description: 'Account deletion initiated' })
+  async deleteAccount(@Request() req: { user: { id: string } }) {
+    await this.usersService.anonymizeUser(req.user.id);
+    await this.auditService.log('gdpr.account_deletion', req.user.id, true);
+    return { message: 'Account deletion initiated. Your personal data has been anonymized.' };
   }
 }
 

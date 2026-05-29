@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import WalletSection from './WalletSection';
 import ReferralSection from './ReferralSection';
 import { NotificationSettings } from '@/components/profile/NotificationSettings';
+import { GdprSection } from '@/components/profile/GdprSection';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useBookmarksStore } from '@/store/bookmarks.store';
 
@@ -314,6 +315,9 @@ export default function ProfilePage() {
 
         {/* Notification Settings */}
         <NotificationSettings />
+
+        {/* GDPR Section */}
+        <GdprSection userId={user.id} />
       </main>
     </ProtectedRoute>
   );
