@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { RateLimit } from '../rate-limit/rate-limit.decorator';
+import { AUTH_RATE_LIMIT } from '../rate-limit/rate-limit.constants';
 import { AuthService } from './auth.service';
 import { StellarAuthService } from './stellar-auth.service';
 import { GoogleAuthGuard } from './google-auth.guard'; // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -58,6 +60,7 @@ export class AuthController {
 
   @Post('stellar')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @RateLimit(AUTH_RATE_LIMIT)
   @ApiOperation({ summary: 'SEP-0010: verify signed challenge and receive JWT' })
   @ApiResponse({ status: 201, description: 'Returns access_token' })
   @ApiResponse({ status: 401, description: 'Invalid or expired challenge' })
@@ -67,6 +70,7 @@ export class AuthController {
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @RateLimit({ limit: 5, windowMs: 60000 })
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ schema: { example: { email: 'user@example.com', password: 'password123' } } })
   @ApiResponse({
@@ -82,6 +86,7 @@ export class AuthController {
 
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @RateLimit({ limit: 5, windowMs: 60000 })
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiBody({ schema: { example: { email: 'user@example.com', password: 'password123' } } })
   @ApiResponse({
@@ -133,6 +138,7 @@ export class AuthController {
   }
 
   @Throttle({ default: { limit: 3, ttl: 3600000 } })
+  @RateLimit({ limit: 3, windowMs: 3600000 })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request a password reset email' })
   @ApiBody({ schema: { example: { email: 'user@example.com' } } })
