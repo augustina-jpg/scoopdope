@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import WalletSection from './WalletSection';
 import ReferralSection from './ReferralSection';
 import { NotificationSettings } from '@/components/profile/NotificationSettings';
+import { PrivacySettings } from '@/components/profile/PrivacySettings';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useBookmarksStore } from '@/store/bookmarks.store';
 
@@ -314,6 +315,9 @@ export default function ProfilePage() {
 
         {/* Notification Settings */}
         <NotificationSettings />
+
+        {/* Privacy & GDPR */}
+        <PrivacySettings />
       </main>
     </ProtectedRoute>
   );
