@@ -41,7 +41,6 @@ jobs:
 
       - name: Run Pact provider verification
         run: npm run test:pact --workspace=apps/backend
-        continue-on-error: true
 
   backend-integration-test:
     name: Backend - Integration Tests (PostgreSQL)
@@ -135,7 +134,6 @@ jobs:
 
       - name: Run Pact consumer tests
         run: npm run test:pact --workspace=apps/frontend
-        continue-on-error: true
 
   chromatic-visual-tests:
     name: Frontend - Visual Regression Tests (Chromatic)

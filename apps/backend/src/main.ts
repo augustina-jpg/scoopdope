@@ -14,16 +14,58 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { MetricsInterceptor } from './metrics/metrics.interceptor';
 import { MetricsService } from './metrics/metrics.service';
-import {
-  API_VERSIONS,
-  DEFAULT_API_VERSION,
-  LATEST_API_VERSION,
-  API_VERSION_HEADER,
-  VERSION_MANIFEST,
-  getVersionInfo,
-} from './common/versioning';
+import { AppDataSource } from './data-source';
+
+async function runMigrationCommand(command: string) {
+  const logger = new Logger('MigrationCommand');
+
+  try {
+    await AppDataSource.initialize();
+    logger.log('DataSource initialized');
+
+    switch (command) {
+      case 'migration:run': {
+        const migrations = await AppDataSource.runMigrations();
+        if (migrations.length === 0) {
+          logger.log('No pending migrations.');
+        } else {
+          logger.log(`Executed ${migrations.length} migration(s):`);
+          migrations.forEach((m) => logger.log(`  ${m.name}`));
+        }
+        break;
+      }
+      case 'migration:revert': {
+        const reverted = await AppDataSource.undoLastMigration();
+        if (reverted) {
+          logger.log(`Reverted: ${reverted.name}`);
+        } else {
+          logger.log('Nothing to revert.');
+        }
+        break;
+      }
+      default:
+        logger.error(`Unknown migration command: ${command}`);
+        process.exit(1);
+    }
+
+    await AppDataSource.destroy();
+    process.exit(0);
+  } catch (error) {
+    logger.error(`Migration command "${command}" failed: ${error}`);
+    process.exit(1);
+  }
+}
 
 async function bootstrap() {
+  const migrationCommand = process.argv
+    .slice(2)
+    .find((a) => a.startsWith('migration:'));
+
+  if (migrationCommand) {
+    await runMigrationCommand(migrationCommand);
+    return;
+  }
+
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const configService = app.get(ConfigService);
@@ -114,7 +156,6 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  // Export OpenAPI spec for static hosting
   if (process.env.EXPORT_OPENAPI === 'true' || process.argv.includes('--export-openapi')) {
     const outputPath = join(__dirname, '..', 'openapi.json');
     writeFileSync(outputPath, JSON.stringify(document, null, 2));
