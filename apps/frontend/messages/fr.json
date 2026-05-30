@@ -97,6 +97,17 @@
     "cancel": "Annuler",
     "redirecting": "Redirection vers la page d'accueil…"
   },
+  "video": {
+    "loading": "Chargement de la vidéo…",
+    "completed": "Leçon terminée"
+  },
+  "vesting": {
+    "title": "Calendrier d'acquisition",
+    "total": "Total : {amount}",
+    "cliffLedger": "Ledger cliff : {ledger}",
+    "endLedger": "Ledger final : {ledger}",
+    "locked": "Bloqué"
+  },
   "shortcuts": {
     "title": "Raccourcis clavier",
     "navigation": "Navigation",

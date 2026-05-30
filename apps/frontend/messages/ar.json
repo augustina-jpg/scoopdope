@@ -97,6 +97,17 @@
     "cancel": "إلغاء",
     "redirecting": "جارٍ إعادة التوجيه إلى الصفحة الرئيسية…"
   },
+  "video": {
+    "loading": "جارٍ تحميل الفيديو…",
+    "completed": "تم إكمال الدرس"
+  },
+  "vesting": {
+    "title": "جدول الاستحقاق",
+    "total": "الإجمالي: {amount}",
+    "cliffLedger": "دفتر cliff: {ledger}",
+    "endLedger": "دفتر النهاية: {ledger}",
+    "locked": "مقفل"
+  },
   "shortcuts": {
     "title": "اختصارات لوحة المفاتيح",
     "navigation": "التنقل",

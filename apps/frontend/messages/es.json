@@ -89,6 +89,17 @@
     "cancel": "Cancelar",
     "redirecting": "Redirigiendo a la página principal…"
   },
+  "video": {
+    "loading": "Cargando video…",
+    "completed": "Lección completada"
+  },
+  "vesting": {
+    "title": "Programa de adquisición",
+    "total": "Total: {amount}",
+    "cliffLedger": "Ledger cliff: {ledger}",
+    "endLedger": "Ledger final: {ledger}",
+    "locked": "Bloqueado"
+  },
   "shortcuts": {
     "title": "Atajos de teclado",
     "navigation": "Navegación",

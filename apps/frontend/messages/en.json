@@ -89,6 +89,17 @@
     "cancel": "Cancel",
     "redirecting": "Redirecting to homepage…"
   },
+  "video": {
+    "loading": "Loading video…",
+    "completed": "Lesson completed"
+  },
+  "vesting": {
+    "title": "Vesting Schedule",
+    "total": "Total: {amount}",
+    "cliffLedger": "Cliff ledger: {ledger}",
+    "endLedger": "End ledger: {ledger}",
+    "locked": "Locked"
+  },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
     "navigation": "Navigation",
