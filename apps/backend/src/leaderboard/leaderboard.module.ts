@@ -5,9 +5,10 @@ import { User } from '../users/user.entity';
 import { LeaderboardController } from './leaderboard.controller';
 import { LeaderboardService } from './leaderboard.service';
 import { MetricsModule } from '../metrics/metrics.module';
+import { ReputationModule } from '../reputation/reputation.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), StellarModule, MetricsModule],
+  imports: [TypeOrmModule.forFeature([User]), StellarModule, MetricsModule, ReputationModule],
   providers: [LeaderboardService],
   controllers: [LeaderboardController],
 })

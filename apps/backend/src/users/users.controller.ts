@@ -20,6 +20,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { StellarService } from '../stellar/stellar.service';
 import { AuditService } from '../audit/audit.service';
+import { ReputationService } from '../reputation/reputation.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -29,6 +30,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly stellarService: StellarService,
     private readonly auditService: AuditService,
+    private readonly reputationService: ReputationService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -74,6 +76,26 @@ export class UsersController {
       throw new NotFoundException('User has no Stellar public key linked');
     const balance = await this.stellarService.getTokenBalance(user.stellarPublicKey);
     return { balance, stellarPublicKey: user.stellarPublicKey };
+  }
+
+  @Get(':id/reputation')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get on-chain reputation score for a user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns on-chain reputation score and cached DB score',
+    schema: { example: { reputationScore: '250', stellarPublicKey: 'G...' } },
+  })
+  @ApiResponse({ status: 404, description: 'User not found or no Stellar key linked' })
+  async getReputation(@Param('id') id: string) {
+    const user = await this.usersService.findById(id);
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.stellarPublicKey)
+      throw new NotFoundException('User has no Stellar public key linked');
+    const reputationScore = await this.reputationService.getReputationScore(user.stellarPublicKey);
+    // Sync cached score to DB
+    await this.usersService.update(id, { reputationScore: Number(reputationScore) });
+    return { reputationScore, stellarPublicKey: user.stellarPublicKey };
   }
 
   @UseGuards(JwtAuthGuard)

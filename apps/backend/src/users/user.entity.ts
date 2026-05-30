@@ -62,6 +62,9 @@ export class User {
   @Column({ nullable: true, type: 'varchar' })
   referredBy: string | null;
 
+  @Column({ default: 0, type: 'bigint' })
+  reputationScore: number;
+
   @Column({ default: 0 })
   currentStreak: number;
 

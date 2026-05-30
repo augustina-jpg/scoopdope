@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { StellarService } from '../stellar/stellar.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { ReputationService } from '../reputation/reputation.service';
 
 type LeaderboardEntry = {
   userId: string;
@@ -13,6 +14,7 @@ type LeaderboardEntry = {
   email: string;
   stellarPublicKey: string;
   balance: string;
+  reputationScore: string;
 };
 
 @Injectable()
@@ -27,7 +29,8 @@ export class LeaderboardService {
     private readonly stellarService: StellarService,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
-    private readonly metricsService: MetricsService
+    private readonly metricsService: MetricsService,
+    private readonly reputationService: ReputationService,
   ) {}
 
   async getTopUsers() {
@@ -45,37 +48,32 @@ export class LeaderboardService {
 
     const walletUsers = users.filter((user) => Boolean(user.stellarPublicKey) && !user.deletedAt);
 
-    const balances = await Promise.all(
+    const entries = await Promise.all(
       walletUsers.map(async (user) => {
-        try {
-          const balance = await this.stellarService.getTokenBalance(user.stellarPublicKey);
-          return {
-            userId: user.id,
-            username: user.username ?? null,
-            email: user.email,
-            stellarPublicKey: user.stellarPublicKey,
-            balance,
-          };
-        } catch {
-          return {
-            userId: user.id,
-            username: user.username ?? null,
-            email: user.email,
-            stellarPublicKey: user.stellarPublicKey,
-            balance: '0',
-          };
-        }
+        const [balance, reputationScore] = await Promise.all([
+          this.stellarService.getTokenBalance(user.stellarPublicKey).catch(() => '0'),
+          this.reputationService.getReputationScore(user.stellarPublicKey).catch(() => String(user.reputationScore ?? 0)),
+        ]);
+        return {
+          userId: user.id,
+          username: user.username ?? null,
+          email: user.email,
+          stellarPublicKey: user.stellarPublicKey,
+          balance,
+          reputationScore,
+        };
       })
     );
 
-    const leaderboard = balances
+    const leaderboard = entries
       .sort((a, b) => {
-        const left = BigInt(a.balance);
-        const right = BigInt(b.balance);
-        if (left === right) {
-          return a.email.localeCompare(b.email);
-        }
-        return right > left ? 1 : -1;
+        // Primary sort: reputation score (descending)
+        const repDiff = BigInt(b.reputationScore) - BigInt(a.reputationScore);
+        if (repDiff !== 0n) return repDiff > 0n ? 1 : -1;
+        // Secondary sort: BST balance (descending)
+        const balDiff = BigInt(b.balance) - BigInt(a.balance);
+        if (balDiff !== 0n) return balDiff > 0n ? 1 : -1;
+        return a.email.localeCompare(b.email);
       })
       .slice(0, 50);
 
