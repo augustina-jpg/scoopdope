@@ -69,6 +69,74 @@ jobs:
         env:
           NODE_ENV: test
 
+  chaos-engineering-test:
+    name: Backend - Chaos Engineering Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: Scoopdope_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Wait for PostgreSQL and Redis
+        run: sleep 25
+
+      - name: Run chaos engineering tests
+        run: npm run test:chaos --workspace=apps/backend
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: postgres
+          DATABASE_PASSWORD: postgres
+          DATABASE_NAME: Scoopdope_test
+          JWT_SECRET: "changemechangeme1234"
+          REDIS_URL: redis://localhost:6379
+          STELLAR_SECRET_KEY: "SDUMMYSDUMMYSDUMMYSDUMMYSDUMMYSDUMMYSDUMMYSDUMMYSDUMMY"
+          EMAIL_HOST: localhost
+          EMAIL_PORT: 587
+          EMAIL_SECURE: 'false'
+          EMAIL_USER: test
+          EMAIL_PASS: test
+          EMAIL_FROM: "Scoopdope <no-reply@scoopdope.app>"
+          EMAIL_ENABLED: 'false'
+          FRONTEND_URL: http://localhost:3001
+          CORS_ORIGINS: http://localhost:3001
+          CORS_CREDENTIALS: 'false'
+          AWS_REGION: us-east-1
+
   backend-soroban-test:
     name: Backend - Soroban Testnet Tests
     runs-on: ubuntu-latest

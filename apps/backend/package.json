@@ -11,6 +11,7 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "type-check": "tsc --noEmit",
     "format:check": "prettier --check .",
+    "test:chaos": "jest --config jest.config.js --runInBand test/chaos-engineering.spec.ts",
     "format": "prettier --write .",
     "test": "jest",
     "test:integration": "jest --config jest-integration.config.js --runInBand",
