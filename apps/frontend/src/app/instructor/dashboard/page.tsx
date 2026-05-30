@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { useAuthStore } from '@/store/auth.store';
 
 interface CourseAnalytics {
   id: string;
@@ -37,6 +38,13 @@ interface DashboardData {
   totalRevenue: number;
   totalTokens: number;
   totalEnrollments: number;
+}
+
+interface EarningsSummary {
+  totalEarnings: number;
+  pendingAmount: number;
+  processedAmount: number;
+  courseBreakdown: { courseId: string; courseTitle: string; earnings: number }[];
 }
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -89,8 +97,10 @@ function getMockData(): DashboardData {
 }
 
 export default function InstructorDashboardPage() {
+  const { user } = useAuthStore();
   const [data, setData] = useState<DashboardData | null>(null);
   const [surveys, setSurveys] = useState<SurveyAggregate[]>([]);
+  const [earnings, setEarnings] = useState<EarningsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -118,11 +128,18 @@ export default function InstructorDashboardPage() {
       } catch {
         // surveys optional
       }
+      if (user?.id) {
+        try {
+          const earningsRes = await api.get(`/v1/payouts/instructor/${user.id}/earnings`);
+          setEarnings(earningsRes.data);
+        } catch {
+          // earnings optional — show nothing rather than crashing
+        }
+      }
       setIsLoading(false);
     }
-    }
     load();
-  }, []);
+  }, [user?.id]);
 
   const d = data ?? getMockData();
   const maxEnrollments = Math.max(...d.courses.map((c) => c.enrollments), 1);
@@ -153,6 +170,56 @@ export default function InstructorDashboardPage() {
           <StatCard label="BST Earned" value={isLoading ? '…' : `${d.totalTokens} BST`} />
           <StatCard label="Courses" value={isLoading ? '…' : d.courses.length} />
         </div>
+
+        {/* Royalty Earnings Summary */}
+        {(isLoading || earnings) && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Royalty Earnings</h2>
+              <Link
+                href="/instructor/revenue"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Full analytics →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <StatCard
+                label="Total Earned"
+                value={isLoading ? '…' : `$${earnings?.totalEarnings?.toFixed(2) ?? '0.00'}`}
+              />
+              <StatCard
+                label="Pending Payout"
+                value={isLoading ? '…' : `$${earnings?.pendingAmount?.toFixed(2) ?? '0.00'}`}
+              />
+              <StatCard
+                label="Paid Out"
+                value={isLoading ? '…' : `$${earnings?.processedAmount?.toFixed(2) ?? '0.00'}`}
+              />
+            </div>
+            {!isLoading && earnings && earnings.courseBreakdown.length > 0 && (
+              <div className="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-2">
+                {earnings.courseBreakdown.map((c) => {
+                  const max = Math.max(...earnings.courseBreakdown.map((x) => x.earnings), 1);
+                  return (
+                    <div key={c.courseId}>
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        <span className="truncate max-w-[60%]">{c.courseTitle}</span>
+                        <span>${c.earnings.toFixed(2)}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                        <div
+                          className="h-full rounded-full bg-green-500"
+                          style={{ width: `${(c.earnings / max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Course Analytics Table */}
         <section>

@@ -3,10 +3,14 @@ import { PayoutsService } from './payouts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { RoyaltyDistributionService } from '../payments/royalty-distribution.service';
 
 @Controller('v1/payouts')
 export class PayoutsController {
-  constructor(private payoutsService: PayoutsService) {}
+  constructor(
+    private payoutsService: PayoutsService,
+    private royaltyService: RoyaltyDistributionService,
+  ) {}
 
   @Post('calculate')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -62,5 +66,11 @@ export class PayoutsController {
   @UseGuards(JwtAuthGuard)
   async getRevenueProjection(@Param('instructorId') instructorId: string) {
     return this.payoutsService.getRevenueProjection(instructorId);
+  }
+
+  @Get('instructor/:instructorId/earnings')
+  @UseGuards(JwtAuthGuard)
+  async getInstructorEarnings(@Param('instructorId') instructorId: string) {
+    return this.royaltyService.getInstructorEarnings(instructorId);
   }
 }

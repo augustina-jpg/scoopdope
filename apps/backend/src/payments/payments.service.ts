@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import Stripe from 'stripe';
 import { Course } from '../courses/course.entity';
 import { CurrencyConversionService, SupportedCurrency } from './currency-conversion.service';
@@ -14,6 +15,7 @@ export class PaymentsService {
   constructor(
     private configService: ConfigService,
     private currencyConversion: CurrencyConversionService,
+    private eventEmitter: EventEmitter2,
     @InjectRepository(Course)
     private courseRepo: Repository<Course>,
   ) {
@@ -71,7 +73,13 @@ export class PaymentsService {
       this.logger.log(
         `Payment succeeded for course ${intent.metadata.courseId} by user ${intent.metadata.userId}`,
       );
-      // Enrollment logic can be triggered here via EventEmitter
+      // Trigger royalty distribution
+      const amountUsd = intent.amount / 100; // Stripe amounts are in cents
+      this.eventEmitter.emit('payment.succeeded', {
+        courseId: intent.metadata.courseId,
+        userId: intent.metadata.userId,
+        amountUsd,
+      });
     }
   }
 }

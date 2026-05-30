@@ -62,6 +62,14 @@ export class Course {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, default: null })
   priceUsd: number | null;
 
+  /**
+   * Percentage of the sale price distributed to instructor(s).
+   * Remaining percentage goes to the platform.
+   * Defaults to 80 (80% instructor, 20% platform).
+   */
+  @Column({ type: 'int', default: 80 })
+  royaltyPercentage: number;
+
   @Column({ type: 'jsonb', nullable: true })
   skills: string[];
 
