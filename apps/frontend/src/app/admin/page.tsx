@@ -6,8 +6,9 @@ import { CourseApprovalList } from '@/components/admin/CourseApprovalList';
 import { SystemHealth } from '@/components/admin/SystemHealth';
 import { InstructorApplicationsList } from '@/components/admin/InstructorApplicationsList';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { BuybackStats } from '@/components/admin/BuybackStats';
 
-type AdminTab = 'stats' | 'analytics' | 'users' | 'courses' | 'instructors' | 'health';
+type AdminTab = 'stats' | 'analytics' | 'users' | 'courses' | 'instructors' | 'health' | 'buyback';
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: 'stats', label: 'Statistics' },
@@ -16,6 +17,7 @@ const TABS: { value: AdminTab; label: string }[] = [
   { value: 'courses', label: 'Course Approvals' },
   { value: 'instructors', label: 'Instructor Applications' },
   { value: 'health', label: 'System Health' },
+  { value: 'buyback', label: 'Buyback' },
 ];
 
 export default function AdminPage() {
@@ -43,6 +45,7 @@ export default function AdminPage() {
       {tab === 'courses' && <CourseApprovalList />}
       {tab === 'instructors' && <InstructorApplicationsList />}
       {tab === 'health' && <SystemHealth />}
+      {tab === 'buyback' && <BuybackStats />}
     </main>
   );
 }
