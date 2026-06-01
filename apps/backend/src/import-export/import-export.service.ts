@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as AdmZip from 'adm-zip';
 import { parseStringPromise } from 'xml2js';
+import { parse as parseCsv } from 'csv-parse/sync';
 import { Course } from '../courses/course.entity';
 import { CourseModule } from '../courses/course-module.entity';
 import { Lesson } from '../courses/lesson.entity';
@@ -74,6 +75,67 @@ export class ImportExportService {
     } catch {
       throw new BadRequestException('Invalid JSON file');
     }
+    this.validateJsonPayload(payload);
+    const courseId = await this.persistCourse(payload.course, instructorId);
+    return { courseId };
+  }
+
+  // ─── CSV Import ────────────────────────────────────────────────────────────
+  // Expected columns: course_title, course_description, course_level,
+  //   course_duration_hours, module_title, module_order,
+  //   lesson_title, lesson_content, lesson_video_url, lesson_order, lesson_duration_minutes
+
+  async importCsv(
+    buffer: Buffer,
+    instructorId: string
+  ): Promise<{ courseId: string }> {
+    let rows: Record<string, string>[];
+    try {
+      rows = parseCsv(buffer, { columns: true, skip_empty_lines: true, trim: true });
+    } catch {
+      throw new BadRequestException('Invalid CSV file');
+    }
+    if (!rows.length) throw new BadRequestException('CSV file is empty');
+
+    const first = rows[0];
+    if (!first['course_title']) throw new BadRequestException('Missing required CSV column: course_title');
+    if (!first['course_description']) throw new BadRequestException('Missing required CSV column: course_description');
+
+    const modulesMap = new Map<string, { title: string; order: number; lessons: CourseJsonExport['course']['modules'][0]['lessons'] }>();
+
+    for (const row of rows) {
+      const moduleKey = `${row['module_order'] ?? '0'}:${row['module_title'] ?? 'Module'}`;
+      if (!modulesMap.has(moduleKey)) {
+        modulesMap.set(moduleKey, {
+          title: row['module_title'] || 'Module',
+          order: parseInt(row['module_order'] || '0', 10),
+          lessons: [],
+        });
+      }
+      if (row['lesson_title']) {
+        modulesMap.get(moduleKey)!.lessons.push({
+          title: row['lesson_title'],
+          content: row['lesson_content'] || '',
+          videoUrl: row['lesson_video_url'] || undefined,
+          order: parseInt(row['lesson_order'] || '0', 10),
+          durationMinutes: parseInt(row['lesson_duration_minutes'] || '0', 10),
+        });
+      }
+    }
+
+    const payload: CourseJsonExport = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      course: {
+        title: first['course_title'],
+        description: first['course_description'],
+        level: first['course_level'] || 'beginner',
+        durationHours: parseInt(first['course_duration_hours'] || '0', 10),
+        requiresKyc: first['requires_kyc'] === 'true',
+        modules: Array.from(modulesMap.values()).sort((a, b) => a.order - b.order),
+      },
+    };
+
     this.validateJsonPayload(payload);
     const courseId = await this.persistCourse(payload.course, instructorId);
     return { courseId };
@@ -150,8 +212,11 @@ export class ImportExportService {
     for (const { name, data } of buffers) {
       try {
         const isScorm = name.endsWith('.zip');
+        const isCsv = name.endsWith('.csv');
         const res = isScorm
           ? await this.importScorm(data, instructorId)
+          : isCsv
+          ? await this.importCsv(data, instructorId)
           : await this.importJson(data, instructorId);
         results[name] = { success: true, courseId: res.courseId };
       } catch (err: unknown) {

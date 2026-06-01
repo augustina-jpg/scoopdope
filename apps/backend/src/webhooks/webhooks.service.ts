@@ -190,4 +190,7 @@ export class WebhooksService implements OnModuleInit {
 
   @OnEvent('credential.issued')
   onCredential(payload: any) { this.publish('credential.issued', payload); }
+
+  @OnEvent('token.rewarded')
+  onTokenRewarded(payload: any) { this.publish('token.rewarded', payload); }
 }

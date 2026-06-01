@@ -53,6 +53,19 @@ export class ImportExportController {
     return this.service.importJson(file.buffer, req.user.id);
   }
 
+  @Post('import/csv')
+  @ApiOperation({ summary: 'Import a course from CSV file' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_SIZE } }))
+  importCsv(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: { user: { id: string } }
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.service.importCsv(file.buffer, req.user.id);
+  }
+
   @Post('import/scorm')
   @ApiOperation({ summary: 'Import a course from SCORM 1.2 or 2004 ZIP package' })
   @ApiConsumes('multipart/form-data')
