@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { KycService } from './kyc.service';
+import { SubmitKycDocumentsDto } from './dto/submit-kyc-documents.dto';
 
 @ApiTags('kyc')
 @Controller('kyc')
@@ -20,6 +22,15 @@ export class KycController {
   upsertCustomer(@Body() body: { stellarPublicKey: string; [key: string]: string }) {
     const { stellarPublicKey, ...fields } = body;
     return this.kycService.upsertCustomer(stellarPublicKey, fields);
+  }
+
+  @Post('documents')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit identity documents for KYC verification' })
+  @ApiResponse({ status: 201, description: 'Documents submitted, KYC status set to pending' })
+  submitDocuments(@Body() dto: SubmitKycDocumentsDto) {
+    return this.kycService.submitDocuments(dto);
   }
 
   /** Webhook called by the KYC provider when verification status changes */

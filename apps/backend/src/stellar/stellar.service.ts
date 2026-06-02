@@ -28,6 +28,7 @@ export class StellarService {
   private credentialMetadataContractId: string;
   private certificateContractId: string;
   private contractId: string;
+  private enrollmentContractId: string;
 
   constructor(
     private configService: ConfigService,
@@ -44,6 +45,8 @@ export class StellarService {
     this.sorobanServer = new SorobanRpc.Server(rpcUrl);
 
     this.contractId = this.configService.get<string>('stellar.contractId') ?? '';
+    this.enrollmentContractId =
+      this.configService.get<string>('stellar.enrollmentContractId') ?? '';
     this.analyticsContractId = this.configService.get<string>('stellar.analyticsContractId') ?? '';
     this.tokenContractId = this.configService.get<string>('stellar.tokenContractId') ?? '';
     this.credentialMetadataContractId =
@@ -55,60 +58,25 @@ export class StellarService {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /**
-   * Invokes the Soroban certificate contract to mint an on-chain certificate.
+   * Records a course enrollment on-chain via the Soroban enrollment contract.
    *
-   * Arguments passed to the contract's `issue_certificate` function:
-   *   - recipient: the student's Stellar public key (Address ScVal)
-   *   - course_id: the course UUID (string ScVal)
-   *   - cert_hash: a SHA-256 hash uniquely identifying this certificate (bytes ScVal)
+   * Invokes the contract's `record_enrollment` function with the student's
+   * public key and the course ID, then returns the resulting transaction hash.
    *
-   * Falls back to a Horizon manageData operation if CERTIFICATE_CONTRACT_ID is
-   * not configured, preserving a permanent on-chain record either way.
-   *
-   * @returns the Stellar transaction hash (64-char hex string)
+   * @throws {Error} if `ENROLLMENT_CONTRACT_ID` is not configured
+   * @throws {Error} propagated from Soroban RPC on simulation/submission failure
    */
-  async mintCertificateNFT(
-    recipientPublicKey: string,
-    certificateHash: string,
-    courseTitle: string,
-  ): Promise<string> {
-    if (this.certificateContractId) {
-      return this.retryWithBackoff(() =>
-        this.invokeContract(this.certificateContractId, 'issue_certificate', [
-          new Address(recipientPublicKey).toScVal(),
-          nativeToScVal(courseTitle, { type: 'string' }),
-          nativeToScVal(certificateHash, { type: 'string' }),
-          nativeToScVal(Math.floor(Date.now() / 1000), { type: 'u64' }),
-        ]),
-      );
+  async recordEnrollment(studentPublicKey: string, courseId: string): Promise<string> {
+    if (!this.enrollmentContractId) {
+      throw new Error('ENROLLMENT_CONTRACT_ID is not configured');
     }
 
-    // Fallback: write cert hash into Horizon account data when no contract is configured
-    this.logger.warn(
-      'CERTIFICATE_CONTRACT_ID not configured — falling back to Horizon manageData',
+    return this.retryWithBackoff(() =>
+      this.invokeContract(this.enrollmentContractId, 'record_enrollment', [
+        new Address(studentPublicKey).toScVal(),
+        nativeToScVal(courseId, { type: 'string' }),
+      ]),
     );
-    const issuerKeypair = Keypair.fromSecret(
-      this.configService.get<string>('stellar.secretKey') ?? '',
-    );
-    const issuerAccount = await this.server.loadAccount(issuerKeypair.publicKey());
-
-    const tx = new TransactionBuilder(issuerAccount, {
-      fee: BASE_FEE,
-      networkPassphrase: this.networkPassphrase,
-    })
-      .addOperation(
-        Operation.manageData({
-          name: `scoopdope:cert:${certificateHash.slice(0, 28)}`,
-          value: recipientPublicKey,
-        }),
-      )
-      .setTimeout(30)
-      .build();
-
-    tx.sign(issuerKeypair);
-    const result = await this.server.submitTransaction(tx);
-    this.logger.log(`Certificate anchored via Horizon fallback: ${result.hash}`);
-    return result.hash;
   }
 
   async getAccountBalance(publicKey: string) {

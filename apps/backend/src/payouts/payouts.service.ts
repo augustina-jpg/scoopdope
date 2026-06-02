@@ -1,10 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Payout } from './payout.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Course } from '../courses/course.entity';
 import { ConfigService } from '@nestjs/config';
+import { KycService } from '../kyc/kyc.service';
 
 @Injectable()
 export class PayoutsService {
@@ -18,6 +19,7 @@ export class PayoutsService {
     @InjectRepository(Course)
     private coursesRepository: Repository<Course>,
     private configService: ConfigService,
+    private kycService: KycService,
   ) {}
 
   async calculatePayouts(startDate: Date, endDate: Date): Promise<Payout[]> {
@@ -71,6 +73,19 @@ export class PayoutsService {
 
     if (!payout) {
       throw new NotFoundException('Payout not found');
+    }
+
+    // Check KYC approval before processing payout
+    const stellarPublicKey = payout.instructor?.stellarPublicKey;
+    if (!stellarPublicKey) {
+      throw new ForbiddenException('Instructor must have a Stellar public key configured to receive payouts');
+    }
+
+    const isKycApproved = await this.kycService.isApproved(stellarPublicKey);
+    if (!isKycApproved) {
+      payout.status = 'failed';
+      await this.payoutsRepository.save(payout);
+      throw new ForbiddenException('KYC verification is required before processing payouts. Please complete KYC verification.');
     }
 
     try {

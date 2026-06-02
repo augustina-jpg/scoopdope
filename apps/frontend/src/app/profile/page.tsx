@@ -11,6 +11,8 @@ import { StreakWidget } from '@/components/ui/StreakWidget';
 import { CreditCard, Star, ExternalLink } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import WalletSection from './WalletSection';
+import { KycVerification } from '@/components/profile/KycVerification';
+import { computeAchievements } from './computeAchievements';
 
 interface User {
   id: string;
@@ -208,6 +210,7 @@ export default function ProfilePage() {
         onLinked={onWalletLinked}
         onUnlinked={onWalletUnlinked}
       />
+      <KycVerification stellarPublicKey={user.stellarPublicKey} />
       <AchievementsSection badges={badges} />
     </main>
   );
