@@ -7,6 +7,7 @@ import { QAPanel } from '@/components/courses/QAPanel';
 import { AnnouncementsPanel } from '@/components/courses/AnnouncementsPanel';
 import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
 import { WaitlistButton } from '@/components/courses/WaitlistButton';
+import { ProgressTracker } from '@/components/courses/ProgressTracker';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompareStore } from '@/store/compare.store';
 import api from '@/lib/api';
@@ -203,6 +204,10 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
 
       {tab === 'curriculum' && (
         <div className="space-y-6">
+          {/* Progress tracker — shown above the module list for enrolled students */}
+          {user && !isInstructor && (
+            <ProgressTracker courseId={courseId} />
+          )}
           {modules.map((mod) => (
             <div key={mod.id} className="space-y-3">
               <div className="flex items-center gap-2">
