@@ -1,9 +1,26 @@
-import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
 import { ForumsService } from './forums.service';
+import { VoteDirection } from './forum-vote.entity';
+import { IsIn } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+class VoteDto {
+  @ApiProperty({ enum: ['up', 'down', 'remove'] })
+  @IsIn(['up', 'down', 'remove'])
+  direction: VoteDirection | 'remove';
+}
 
 @ApiTags('forums')
 @Controller()
@@ -41,5 +58,31 @@ export class ForumsController {
     @Body() dto: CreateReplyDto
   ) {
     return this.forumsService.createReply(postId, req.user.id, req.user.role, dto);
+  }
+
+  @Post('posts/:id/vote')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upvote, downvote, or remove vote on a post' })
+  @ApiResponse({ status: 200, description: 'Vote recorded, returns updated post' })
+  votePost(
+    @Param('id') postId: string,
+    @Request() req: { user: { id: string } },
+    @Body() dto: VoteDto
+  ) {
+    return this.forumsService.votePost(postId, req.user.id, dto.direction);
+  }
+
+  @Post('replies/:id/vote')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upvote, downvote, or remove vote on a reply' })
+  @ApiResponse({ status: 200, description: 'Vote recorded, returns updated reply' })
+  voteReply(
+    @Param('id') replyId: string,
+    @Request() req: { user: { id: string } },
+    @Body() dto: VoteDto
+  ) {
+    return this.forumsService.voteReply(replyId, req.user.id, dto.direction);
   }
 }
