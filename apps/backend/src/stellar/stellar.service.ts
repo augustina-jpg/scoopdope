@@ -27,6 +27,7 @@ export class StellarService {
   private tokenContractId: string;
   private credentialMetadataContractId: string;
   private contractId: string;
+  private enrollmentContractId: string;
 
   constructor(
     private configService: ConfigService,
@@ -43,6 +44,8 @@ export class StellarService {
     this.sorobanServer = new SorobanRpc.Server(rpcUrl);
 
     this.contractId = this.configService.get<string>('stellar.contractId') ?? '';
+    this.enrollmentContractId =
+      this.configService.get<string>('stellar.enrollmentContractId') ?? '';
     this.analyticsContractId = this.configService.get<string>('stellar.analyticsContractId') ?? '';
     this.tokenContractId = this.configService.get<string>('stellar.tokenContractId') ?? '';
     this.credentialMetadataContractId =
@@ -50,6 +53,28 @@ export class StellarService {
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
+
+  /**
+   * Records a course enrollment on-chain via the Soroban enrollment contract.
+   *
+   * Invokes the contract's `record_enrollment` function with the student's
+   * public key and the course ID, then returns the resulting transaction hash.
+   *
+   * @throws {Error} if `ENROLLMENT_CONTRACT_ID` is not configured
+   * @throws {Error} propagated from Soroban RPC on simulation/submission failure
+   */
+  async recordEnrollment(studentPublicKey: string, courseId: string): Promise<string> {
+    if (!this.enrollmentContractId) {
+      throw new Error('ENROLLMENT_CONTRACT_ID is not configured');
+    }
+
+    return this.retryWithBackoff(() =>
+      this.invokeContract(this.enrollmentContractId, 'record_enrollment', [
+        new Address(studentPublicKey).toScVal(),
+        nativeToScVal(courseId, { type: 'string' }),
+      ]),
+    );
+  }
 
   async getAccountBalance(publicKey: string) {
     const account = await this.server.loadAccount(publicKey);

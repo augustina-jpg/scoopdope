@@ -23,6 +23,7 @@ export default () => ({
     secretKey: process.env.STELLAR_SECRET_KEY!,
     sorobanRpcUrl: process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
     contractId: process.env.SOROBAN_CONTRACT_ID || '',
+    enrollmentContractId: process.env.ENROLLMENT_CONTRACT_ID || '',
     analyticsContractId: process.env.ANALYTICS_CONTRACT_ID || '',
     credentialMetadataContractId: process.env.CREDENTIAL_METADATA_CONTRACT_ID || '',
     tokenContractId: process.env.TOKEN_CONTRACT_ID || '',

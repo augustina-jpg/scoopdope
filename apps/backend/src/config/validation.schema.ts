@@ -23,6 +23,7 @@ export const validationSchema = Joi.object({
   STELLAR_SECRET_KEY: Joi.string().required(),
   SOROBAN_RPC_URL: Joi.string().uri().default('https://soroban-testnet.stellar.org'),
   SOROBAN_CONTRACT_ID: Joi.string().allow('').default(''),
+  ENROLLMENT_CONTRACT_ID: Joi.string().allow('').default(''),
   ANALYTICS_CONTRACT_ID: Joi.string().allow('').default(''),
   TOKEN_CONTRACT_ID: Joi.string().allow('').default(''),
   CREDENTIAL_METADATA_CONTRACT_ID: Joi.string().allow('').default(''),
