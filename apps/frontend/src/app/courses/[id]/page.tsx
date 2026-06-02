@@ -6,6 +6,7 @@ import { ReviewList } from '@/components/reviews/ReviewList';
 import { QAPanel } from '@/components/courses/QAPanel';
 import { AnnouncementsPanel } from '@/components/courses/AnnouncementsPanel';
 import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
+import { CourseForumTab } from '@/components/forum/CourseForumTab';
 import { WaitlistButton } from '@/components/courses/WaitlistButton';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompareStore } from '@/store/compare.store';
@@ -27,7 +28,7 @@ interface CourseData {
 }
 
 export default function CourseDetailPage({ params }: CourseDetailPageProps) {
-  const [tab, setTab] = useState<'overview' | 'curriculum' | 'reviews' | 'qa' | 'announcements' | 'assignments'>('overview');
+  const [tab, setTab] = useState<'overview' | 'curriculum' | 'reviews' | 'qa' | 'announcements' | 'assignments' | 'forum'>('overview');
   const [reviewsKey, setReviewsKey] = useState(0);
   const [modules, setModules] = useState<any[]>([]);
   const [enrolling, setEnrolling] = useState(false);
@@ -171,7 +172,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       </Link>
 
       <div className="flex gap-4 border-b mb-6 overflow-x-auto">
-        {(['overview', 'curriculum', 'reviews', 'qa', 'announcements', 'assignments'] as const).map((t) => (
+        {(['overview', 'curriculum', 'reviews', 'qa', 'announcements', 'assignments', 'forum'] as const).map((t) => (
           <button
             key={t}
             className={`pb-2 px-1 capitalize text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -270,6 +271,10 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
 
       {tab === 'assignments' && (
         <AssignmentsTab courseId={courseId} />
+      )}
+
+      {tab === 'forum' && (
+        <CourseForumTab courseId={courseId} />
       )}
     </main>
   );
