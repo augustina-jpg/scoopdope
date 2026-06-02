@@ -25,6 +25,7 @@ export default () => ({
     contractId: process.env.SOROBAN_CONTRACT_ID || '',
     analyticsContractId: process.env.ANALYTICS_CONTRACT_ID || '',
     credentialMetadataContractId: process.env.CREDENTIAL_METADATA_CONTRACT_ID || '',
+    certificateContractId: process.env.CERTIFICATE_CONTRACT_ID || '',
     tokenContractId: process.env.TOKEN_CONTRACT_ID || '',
     indexerPollIntervalMs: parseInt(process.env.INDEXER_POLL_INTERVAL_MS || '5000', 10),
     webAuthDomain: process.env.STELLAR_WEB_AUTH_DOMAIN || 'localhost',
