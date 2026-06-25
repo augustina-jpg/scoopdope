@@ -1,5 +1,6 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
+import { DatabaseConfigParser } from './common/utils/database-config';
 
 config();
 
@@ -18,13 +19,16 @@ if ((isProduction || isStaging) && synchronize) {
   );
 }
 
+// Parse database configuration (supports both DATABASE_URL and individual env vars)
+const dbConfig = DatabaseConfigParser.parse();
+
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
-  host: process.env.DATABASE_HOST || 'localhost',
-  port: parseInt(process.env.DATABASE_PORT || '5432', 10),
-  username: process.env.DATABASE_USER,
-  password: process.env.DATABASE_PASSWORD,
-  database: process.env.DATABASE_NAME || 'scoopdope',
+  host: dbConfig.host,
+  port: dbConfig.port,
+  username: dbConfig.username,
+  password: dbConfig.password,
+  database: dbConfig.name,
   entities: isProduction
     ? ['dist/**/*.entity.js']
     : ['src/**/*.entity.ts'],
