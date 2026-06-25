@@ -92,4 +92,8 @@ export default () => ({
   exchangeRate: {
     apiKey: process.env.EXCHANGE_RATE_API_KEY || '',
   },
+
+  health: {
+    diskPath: process.env.HEALTH_DISK_PATH,
+  },
 });
