@@ -411,16 +411,26 @@ impl LiquidityPoolContract {
         (amount_a * reserve_b) / reserve_a
     }
 
-    fn sqrt(x: i128) -> i128 {
+    pub fn sqrt(x: i128) -> i128 {
         if x == 0 || x == 1 {
             return x;
         }
+
+        // Ensure x doesn't exceed i128::MAX / 2 to prevent overflow in intermediate calculations
+        assert!(x <= i128::MAX / 2, "Input value too large for sqrt calculation");
+
         let mut z = (x + 1) / 2;
         let mut y = x;
+
         while z < y {
             y = z;
-            z = (x / z + z) / 2;
+
+            // Use checked operations to detect overflow
+            let x_div_z = x / z;
+            let sum = x_div_z.checked_add(z).expect("Overflow in sqrt calculation: sum exceeded i128::MAX");
+            z = sum / 2;
         }
+
         y
     }
 }

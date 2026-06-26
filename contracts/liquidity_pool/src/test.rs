@@ -73,3 +73,46 @@ fn get_user_liquidity_tracks_provider_balance() {
     let shares = client.add_liquidity(&provider, &1_000_000, &1_000_000, &0, &0);
     assert_eq!(client.get_user_liquidity(&provider), shares);
 }
+
+#[test]
+fn sqrt_handles_basic_values() {
+    let (_, client, _) = setup_pool();
+
+    // Test zero
+    let sqrt_0 = LiquidityPoolContract::sqrt(0);
+    assert_eq!(sqrt_0, 0, "sqrt(0) should be 0");
+
+    // Test one
+    let sqrt_1 = LiquidityPoolContract::sqrt(1);
+    assert_eq!(sqrt_1, 1, "sqrt(1) should be 1");
+
+    // Test perfect squares
+    let sqrt_4 = LiquidityPoolContract::sqrt(4);
+    assert!(sqrt_4 >= 1 && sqrt_4 <= 3, "sqrt(4) should be close to 2");
+
+    let sqrt_100 = LiquidityPoolContract::sqrt(100);
+    assert!(sqrt_100 >= 9 && sqrt_100 <= 11, "sqrt(100) should be close to 10");
+}
+
+#[test]
+fn sqrt_safely_handles_large_values() {
+    let (_, client, _) = setup_pool();
+
+    // Test with large value within safe range (i128::MAX / 2)
+    let large_value = 1_000_000_000_000_000_000i128; // 10^18
+    let result = LiquidityPoolContract::sqrt(large_value);
+
+    // sqrt(10^18) ≈ 10^9
+    assert!(result > 0, "sqrt of large value should be positive");
+    assert!(result < large_value, "sqrt result should be less than input");
+}
+
+#[test]
+#[should_panic(expected = "Input value too large")]
+fn sqrt_panics_on_overflow_input() {
+    let (_, client, _) = setup_pool();
+
+    // This should panic - value exceeds i128::MAX / 2
+    let overflow_value = i128::MAX;
+    let _result = LiquidityPoolContract::sqrt(overflow_value);
+}
