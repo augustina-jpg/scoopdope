@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, ServiceUnavailableException, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -18,7 +18,7 @@ const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
 @Injectable()
-export class StellarService {
+export class StellarService implements OnApplicationShutdown {
   private readonly logger = new Logger(StellarService.name);
   private server: Horizon.Server;
   private sorobanServer: SorobanRpc.Server;
@@ -29,6 +29,10 @@ export class StellarService {
   private certificateContractId: string;
   private contractId: string;
   private enrollmentContractId: string;
+  private secretKey: string;
+  private pendingTransactionCount = 0;
+  private isShuttingDown = false;
+  private readonly SHUTDOWN_TIMEOUT_MS = 10000;
 
   constructor(
     private configService: ConfigService,
@@ -53,6 +57,15 @@ export class StellarService {
       this.configService.get<string>('stellar.credentialMetadataContractId') ?? '';
     this.certificateContractId =
       this.configService.get<string>('stellar.certificateContractId') ?? '';
+    this.secretKey = this.configService.get<string>('stellar.secretKey') ?? '';
+
+    if (!this.secretKey) {
+      this.logger.warn(
+        '⚠️  STELLAR_SECRET_KEY is not configured. ' +
+          'Read-only operations (querying balances, transactions) will work, ' +
+          'but signing operations (issuing credentials, minting tokens) will fail.'
+      );
+    }
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -67,15 +80,18 @@ export class StellarService {
    * @throws {Error} propagated from Soroban RPC on simulation/submission failure
    */
   async recordEnrollment(studentPublicKey: string, courseId: string): Promise<string> {
+    this.ensureSecretKeyConfigured();
     if (!this.enrollmentContractId) {
       throw new Error('ENROLLMENT_CONTRACT_ID is not configured');
     }
 
-    return this.retryWithBackoff(() =>
-      this.invokeContract(this.enrollmentContractId, 'record_enrollment', [
-        new Address(studentPublicKey).toScVal(),
-        nativeToScVal(courseId, { type: 'string' }),
-      ]),
+    return this.trackTransaction(() =>
+      this.retryWithBackoff(() =>
+        this.invokeContract(this.enrollmentContractId, 'record_enrollment', [
+          new Address(studentPublicKey).toScVal(),
+          nativeToScVal(courseId, { type: 'string' }),
+        ]),
+      )
     );
   }
 
@@ -123,37 +139,39 @@ export class StellarService {
     courseId: string,
     metadata?: { courseName: string; grade: string; skills: string[] }
   ): Promise<string> {
-    try {
-      await this.retryWithBackoff(() => this.recordProgressOnChain(recipientPublicKey, courseId));
-      this.logger.log(`Progress recorded on Soroban for ${courseId}`);
-    } catch (error: any) {
-      this.logger.error(
-        `Failed to record progress on Soroban: ${error.message}, falling back to Horizon`
-      );
-      await this.issueCredentialFallback(recipientPublicKey, courseId);
-    }
-
-    if (metadata && this.credentialMetadataContractId) {
+    this.ensureSecretKeyConfigured();
+    return this.trackTransaction(async () => {
       try {
-        await this.retryWithBackoff(() =>
-          this.storeCredentialMetadata(recipientPublicKey, metadata)
-        );
-        this.logger.log(`Metadata stored on-chain for ${metadata.courseName}`);
+        await this.retryWithBackoff(() => this.recordProgressOnChain(recipientPublicKey, courseId));
+        this.logger.log(`Progress recorded on Soroban for ${courseId}`);
       } catch (error: any) {
-        this.logger.error(`Failed to store metadata on-chain: ${error.message}`);
+        this.logger.error(
+          `Failed to record progress on Soroban: ${error.message}, falling back to Horizon`
+        );
+        await this.issueCredentialFallback(recipientPublicKey, courseId);
       }
-    }
 
-    return this.mintCredentialViaHorizon(recipientPublicKey, courseId);
+      if (metadata && this.credentialMetadataContractId) {
+        try {
+          await this.retryWithBackoff(() =>
+            this.storeCredentialMetadata(recipientPublicKey, metadata)
+          );
+          this.logger.log(`Metadata stored on-chain for ${metadata.courseName}`);
+        } catch (error: any) {
+          this.logger.error(`Failed to store metadata on-chain: ${error.message}`);
+        }
+      }
+
+      return this.mintCredentialViaHorizon(recipientPublicKey, courseId);
+    });
   }
 
   async storeCredentialMetadata(
     studentPublicKey: string,
     metadata: { courseName: string; grade: string; skills: string[] }
   ): Promise<string> {
-    const issuerKeypair = Keypair.fromSecret(
-      this.configService.get<string>('stellar.secretKey') ?? ''
-    );
+    this.ensureSecretKeyConfigured();
+    const issuerKeypair = Keypair.fromSecret(this.secretKey);
 
     return this.invokeContract(this.credentialMetadataContractId, 'store_metadata', [
       new Address(issuerKeypair.publicKey()).toScVal(), // admin
@@ -170,17 +188,21 @@ export class StellarService {
     courseId: string,
     _progressPct: number
   ): Promise<string> {
-    return this.retryWithBackoff(() =>
-      this.invokeContract(this.analyticsContractId ?? this.contractId, 'record_progress', [
-        new Address(studentPublicKey).toScVal(),
-        nativeToScVal(courseId, { type: 'symbol' }),
-        nativeToScVal(_progressPct, { type: 'i32' }),
-      ])
+    this.ensureSecretKeyConfigured();
+    return this.trackTransaction(() =>
+      this.retryWithBackoff(() =>
+        this.invokeContract(this.analyticsContractId ?? this.contractId, 'record_progress', [
+          new Address(studentPublicKey).toScVal(),
+          nativeToScVal(courseId, { type: 'symbol' }),
+          nativeToScVal(_progressPct, { type: 'i32' }),
+        ])
+      )
     );
   }
 
   /** Read BST balance for an address from the Token contract (read-only simulate) */
   async getTokenBalance(stellarPublicKey: string): Promise<string> {
+    this.ensureSecretKeyConfigured();
     if (!this.tokenContractId) {
       throw new Error('TOKEN_CONTRACT_ID not configured');
     }
@@ -189,9 +211,7 @@ export class StellarService {
     const cached = await this.cacheManager.get<string>(cacheKey);
     if (cached !== undefined && cached !== null) return cached;
 
-    const issuerKeypair = Keypair.fromSecret(
-      this.configService.get<string>('stellar.secretKey') ?? ''
-    );
+    const issuerKeypair = Keypair.fromSecret(this.secretKey);
     const source = await this.sorobanServer.getAccount(issuerKeypair.publicKey());
 
     const tx = new TransactionBuilder(source as any, {
@@ -223,18 +243,75 @@ export class StellarService {
 
   /** Mint reward tokens via the Token Soroban contract */
   async mintReward(recipientPublicKey: string, amount: number): Promise<string> {
+    this.ensureSecretKeyConfigured();
     if (!this.tokenContractId) {
       throw new Error('TOKEN_CONTRACT_ID not configured');
     }
-    return this.retryWithBackoff(() =>
-      this.invokeContract(this.tokenContractId, 'mint_reward', [
-        new Address(recipientPublicKey).toScVal(),
-        nativeToScVal(amount, { type: 'i128' }),
-      ])
+    return this.trackTransaction(() =>
+      this.retryWithBackoff(() =>
+        this.invokeContract(this.tokenContractId, 'mint_reward', [
+          new Address(recipientPublicKey).toScVal(),
+          nativeToScVal(amount, { type: 'i128' }),
+        ])
+      )
     );
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  private ensureSecretKeyConfigured(): void {
+    if (!this.secretKey) {
+      throw new ServiceUnavailableException(
+        'STELLAR_SECRET_KEY is not configured. ' +
+          'Signing operations (issuing credentials, minting tokens, recording progress) require the secret key. ' +
+          'Configure STELLAR_SECRET_KEY environment variable to enable these features.'
+      );
+    }
+  }
+
+  async onApplicationShutdown(signal?: string) {
+    this.logger.log(`Shutting down StellarService (signal: ${signal})`);
+    this.isShuttingDown = true;
+
+    if (this.pendingTransactionCount > 0) {
+      this.logger.warn(
+        `⏳ Waiting for ${this.pendingTransactionCount} pending Stellar transaction(s) to complete...`
+      );
+
+      const startTime = Date.now();
+      while (this.pendingTransactionCount > 0 && Date.now() - startTime < this.SHUTDOWN_TIMEOUT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      if (this.pendingTransactionCount > 0) {
+        this.logger.warn(
+          `⚠️  Shutdown timeout: ${this.pendingTransactionCount} Stellar transaction(s) still pending after ${this.SHUTDOWN_TIMEOUT_MS}ms. ` +
+            'These may result in user charges without database records. Consider increasing deployment grace period.'
+        );
+      } else {
+        this.logger.log('✅ All pending Stellar transactions completed successfully');
+      }
+    }
+  }
+
+  private incrementPendingTransactions(): void {
+    this.pendingTransactionCount++;
+  }
+
+  private decrementPendingTransactions(): void {
+    if (this.pendingTransactionCount > 0) {
+      this.pendingTransactionCount--;
+    }
+  }
+
+  private async trackTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    this.incrementPendingTransactions();
+    try {
+      return await fn();
+    } finally {
+      this.decrementPendingTransactions();
+    }
+  }
 
   private async recordProgressOnChain(studentPublicKey: string, courseId: string): Promise<void> {
     await this.invokeContract(this.analyticsContractId ?? this.contractId, 'record_progress', [
@@ -248,9 +325,8 @@ export class StellarService {
     recipientPublicKey: string,
     courseId: string
   ): Promise<void> {
-    const issuerKeypair = Keypair.fromSecret(
-      this.configService.get<string>('stellar.secretKey') ?? ''
-    );
+    this.ensureSecretKeyConfigured();
+    const issuerKeypair = Keypair.fromSecret(this.secretKey);
     const issuerAccount = await this.server.loadAccount(issuerKeypair.publicKey());
 
     const tx = new TransactionBuilder(issuerAccount, {
@@ -271,9 +347,8 @@ export class StellarService {
   }
 
   private async invokeContract(contractId: string, method: string, args: any[]): Promise<string> {
-    const issuerKeypair = Keypair.fromSecret(
-      this.configService.get<string>('stellar.secretKey') ?? ''
-    );
+    this.ensureSecretKeyConfigured();
+    const issuerKeypair = Keypair.fromSecret(this.secretKey);
     const source = await this.sorobanServer.getAccount(issuerKeypair.publicKey());
 
     const tx = new TransactionBuilder(source as any, {
@@ -301,9 +376,8 @@ export class StellarService {
     recipientPublicKey: string,
     courseId: string
   ): Promise<string> {
-    const issuerKeypair = Keypair.fromSecret(
-      this.configService.get<string>('stellar.secretKey') ?? ''
-    );
+    this.ensureSecretKeyConfigured();
+    const issuerKeypair = Keypair.fromSecret(this.secretKey);
     const issuerAccount = await this.server.loadAccount(issuerKeypair.publicKey());
 
     const tx = new TransactionBuilder(issuerAccount, {

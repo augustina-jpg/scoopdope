@@ -17,6 +17,7 @@
     "test:integration": "jest --config jest-integration.config.js --runInBand",
     "test:e2e": "jest --config jest-e2e.config.js --runInBand",
     "test:pact": "jest --testPathPattern=pact",
+    "test:mutation:ci": "stryker run --reporters=json,clear-text",
     "migration:run": "node dist/database/migration-runner.js run",
     "migration:revert": "node dist/database/migration-runner.js revert",
     "migration:show": "node dist/database/migration-runner.js show",
