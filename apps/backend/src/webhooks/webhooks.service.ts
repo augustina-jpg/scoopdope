@@ -58,6 +58,30 @@ export class WebhooksService implements OnModuleInit {
     return this.webhookRepo.save(wh);
   }
 
+  // --- Delivery queue (concurrency-limited) ---
+
+  private readonly deliveryQueue: Array<{ wh: Webhook; delivery: WebhookDelivery }> = [];
+  private draining = false;
+  private readonly MAX_CONCURRENT = 5;
+
+  private enqueue(wh: Webhook, delivery: WebhookDelivery): void {
+    this.deliveryQueue.push({ wh, delivery });
+    if (!this.draining) {
+      this.draining = true;
+      this.drainQueue();
+    }
+  }
+
+  private async drainQueue(): Promise<void> {
+    while (this.deliveryQueue.length > 0) {
+      const batch = this.deliveryQueue.splice(0, this.MAX_CONCURRENT);
+      await Promise.allSettled(
+        batch.map(({ wh, delivery }) => this.deliver(wh, delivery))
+      );
+    }
+    this.draining = false;
+  }
+
   // --- Event publishing ---
 
   async publish(event: string, payload: object): Promise<void> {
@@ -74,7 +98,7 @@ export class WebhooksService implements OnModuleInit {
         payload: JSON.stringify(payload),
       });
       const saved = await this.deliveryRepo.save(delivery);
-      setImmediate(() => this.deliver(wh, saved));
+      this.enqueue(wh, saved);
     }
   }
 

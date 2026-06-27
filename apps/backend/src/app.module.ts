@@ -88,6 +88,11 @@ import { validationSchema } from './config/validation.schema';
           database: config.get<string>('database.name'),
           autoLoadEntities: true,
           synchronize,
+          extra: {
+            max: config.get<number>('database.poolSize') || 20,
+            idleTimeoutMillis: 30_000,
+            connectionTimeoutMillis: 5_000,
+          },
         };
       },
     }),
