@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import api from '@/lib/api';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CircularProgress } from '@/components/ui/CircularProgress';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { StreakWidget } from '@/components/ui/StreakWidget';
 import { TokenBalanceWidget } from '@/components/dashboard/TokenBalanceWidget';
 import { CheckCircle2 } from 'lucide-react';
@@ -36,12 +37,6 @@ interface CredentialRecord {
 interface CourseData {
   id: string;
   title: string;
-}
-
-function SkeletonItem({ width = 'w-full', height = 'h-6' }: { width?: string; height?: string }) {
-  return (
-    <div className={`bg-gray-200 dark:bg-gray-700 rounded ${width} ${height} animate-pulse`} />
-  );
 }
 
 export default function DashboardPage() {
@@ -170,8 +165,8 @@ export default function DashboardPage() {
         <section>
           {isLoading ? (
             <div className="space-y-2">
-              <SkeletonItem width="w-48" height="h-8" />
-              <SkeletonItem width="w-64" height="h-5" />
+              <Skeleton className="w-48 h-8" />
+              <Skeleton className="w-64 h-5" />
             </div>
           ) : (
             <div>
@@ -320,8 +315,8 @@ export default function DashboardPage() {
             {isLoading ? (
               Array.from({ length: 3 }).map((_, idx) => (
                 <div key={idx} className="space-y-2">
-                  <SkeletonItem width="w-2/5" height="h-5" />
-                  <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
+                  <Skeleton className="w-2/5 h-5" />
+                  <Skeleton className="w-full h-3" />
                 </div>
               ))
             ) : enrolledCourses.length === 0 ? (
@@ -360,7 +355,7 @@ export default function DashboardPage() {
           <div className="mt-3 space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
             {isLoading ? (
               Array.from({ length: 3 }).map((_, idx) => (
-                <SkeletonItem key={idx} width="w-full" height="h-6" />
+                <Skeleton key={idx} className="w-full h-6" />
               ))
             ) : recentCredentials.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400">
