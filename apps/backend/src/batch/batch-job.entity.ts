@@ -41,6 +41,9 @@ export class BatchJob {
   @Column({ nullable: true })
   createdById: string;
 
+  @Column({ nullable: true, type: 'timestamp' })
+  startedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
