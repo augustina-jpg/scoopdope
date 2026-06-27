@@ -507,6 +507,29 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: Scoopdope_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -530,6 +553,44 @@ jobs:
 
       - name: Build backend Docker image
         run: docker build -t scoopdope-backend:${{ github.sha }} -f apps/backend/Dockerfile .
+
+      - name: Smoke test backend container
+        run: |
+          docker run -d --name scoopdope-smoke --network host \
+            -e NODE_ENV=production \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/Scoopdope_test \
+            -e REDIS_URL=redis://localhost:6379 \
+            -e JWT_SECRET=smoke-test-secret-key-min-length \
+            -e STELLAR_NETWORK=testnet \
+            -e STELLAR_SECRET_KEY=SBZVMB74Z7TTIWZNZ7CLBT6OJRZKMV4ZSM7CEGJR5ZJQSTQG5O6HBSY \
+            -e CORS_ORIGINS=http://localhost:3001 \
+            -e FRONTEND_URL=http://localhost:3001 \
+            -e EMAIL_ENABLED=false \
+            scoopdope-backend:${{ github.sha }}
+          for i in $(seq 1 15); do
+            STATUS=$(docker inspect -f '{{.State.Status}}' scoopdope-smoke 2>/dev/null)
+            if [ "$STATUS" = "running" ]; then
+              echo "Backend container is running (attempt $i)"
+              if curl -sf http://localhost:3000/health/live > /dev/null 2>&1; then
+                echo "Health endpoint reachable"
+                curl -s http://localhost:3000/health/live
+                docker stop scoopdope-smoke
+                docker rm scoopdope-smoke
+                exit 0
+              fi
+            elif [ "$STATUS" = "exited" ]; then
+              echo "Backend container exited during startup"
+              docker logs scoopdope-smoke 2>/dev/null || true
+              docker rm scoopdope-smoke 2>/dev/null || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Backend container failed to start within timeout"
+          docker logs scoopdope-smoke 2>/dev/null || true
+          docker stop scoopdope-smoke 2>/dev/null || true
+          docker rm scoopdope-smoke 2>/dev/null || true
+          exit 1
 
       - name: Build frontend Docker image
         run: docker build -t scoopdope-frontend:${{ github.sha }} -f apps/frontend/Dockerfile .
