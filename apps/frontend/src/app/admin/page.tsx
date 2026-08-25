@@ -6,12 +6,14 @@ import { CourseApprovalList } from '@/components/admin/CourseApprovalList';
 import { SystemHealth } from '@/components/admin/SystemHealth';
 import { InstructorApplicationsList } from '@/components/admin/InstructorApplicationsList';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { UsageStatistics } from '@/components/admin/UsageStatistics';
 
-type AdminTab = 'stats' | 'analytics' | 'users' | 'courses' | 'instructors' | 'health';
+type AdminTab = 'stats' | 'analytics' | 'usage' | 'users' | 'courses' | 'instructors' | 'health';
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: 'stats', label: 'Statistics' },
   { value: 'analytics', label: 'Analytics' },
+  { value: 'usage', label: 'Usage Statistics' },
   { value: 'users', label: 'Users' },
   { value: 'courses', label: 'Course Approvals' },
   { value: 'instructors', label: 'Instructor Applications' },
@@ -39,6 +41,7 @@ export default function AdminPage() {
       </div>
       {tab === 'stats' && <StatsCards />}
       {tab === 'analytics' && <AnalyticsDashboard />}
+      {tab === 'usage' && <UsageStatistics />}
       {tab === 'users' && <UserTable />}
       {tab === 'courses' && <CourseApprovalList />}
       {tab === 'instructors' && <InstructorApplicationsList />}

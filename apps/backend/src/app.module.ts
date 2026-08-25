@@ -43,6 +43,7 @@ import { AuditModule } from './audit/audit.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { ApiVersionModule } from './common/versioning';
+import { DeprecationInterceptor } from './common/versioning/deprecation.interceptor';
 import { PayoutsModule } from './payouts/payouts.module';
 import { InstructorApplicationsModule } from './instructor-applications/instructor-applications.module';
 import { AssignmentsModule } from './assignments/assignments.module';
@@ -170,6 +171,7 @@ import { validationSchema } from './config/validation.schema';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: UserRateLimitGuard },
     { provide: APP_INTERCEPTOR, useClass: ApiUsageInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: DeprecationInterceptor },
   ],
 })
 export class AppModule {}
