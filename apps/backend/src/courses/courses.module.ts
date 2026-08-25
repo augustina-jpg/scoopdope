@@ -3,11 +3,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Course } from './course.entity';
 import { CourseModule } from './course-module.entity';
 import { Lesson } from './lesson.entity';
+import { Category } from './category.entity';
 import { CoursesService } from './courses.service';
 import { ModulesService } from './modules.service';
 import { LessonsService } from './lessons.service';
+import { CategoriesService } from './categories.service';
 import { CoursesController } from './courses.controller';
 import { ModulesController } from './modules.controller';
+import { CategoriesController } from './categories.controller';
 import { Review } from './review.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { ReviewsService } from './reviews.service';
@@ -28,13 +31,13 @@ import { User } from '../users/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Course, CourseModule, Lesson, Review, Enrollment, CourseVersion, CoursePrerequisite, User]),
+    TypeOrmModule.forFeature([Course, CourseModule, Lesson, Review, Enrollment, CourseVersion, CoursePrerequisite, User, Category]),
     SearchModule,
     NotificationsModule,
     MetricsModule,
   ],
-  providers: [CoursesService, ModulesService, LessonsService, ReviewsService, CourseVersioningService, PrerequisitesService, CourseSchedulerService, DripSchedulerService, TranscribeService],
-  controllers: [CoursesController, ModulesController, ReviewsController, CourseVersioningController, PrerequisitesController],
-  exports: [CoursesService, PrerequisitesService],
+  providers: [CoursesService, ModulesService, LessonsService, ReviewsService, CourseVersioningService, PrerequisitesService, CourseSchedulerService, DripSchedulerService, TranscribeService, CategoriesService],
+  controllers: [CoursesController, ModulesController, ReviewsController, CourseVersioningController, PrerequisitesController, CategoriesController],
+  exports: [CoursesService, PrerequisitesService, CategoriesService],
 })
 export class CoursesModule {}

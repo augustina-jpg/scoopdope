@@ -23,11 +23,11 @@ export class CoursesService {
   ) {}
 
   async findAll(query: CourseQueryDto = {}) {
-    const { search, level, language, page = 1, limit = 20 } = query;
+    const { search, level, language, categoryId, category, page = 1, limit = 20 } = query;
 
     // Cache key encodes all filter params; skip cache for search queries
     const cacheKey = !search
-      ? `courses:catalog:${level ?? ''}:${language ?? ''}:${page}:${limit}`
+      ? `courses:catalog:${level ?? ''}:${language ?? ''}:${categoryId ?? ''}:${category ?? ''}:${page}:${limit}`
       : null;
 
     if (cacheKey) {
@@ -41,6 +41,7 @@ export class CoursesService {
 
     const qb = this.repo
       .createQueryBuilder('course')
+      .leftJoinAndSelect('course.category', 'category')
       .where('course.isPublished = :isPublished', { isPublished: true })
       .andWhere('course.isDeleted = :isDeleted', { isDeleted: false });
 
@@ -58,6 +59,13 @@ export class CoursesService {
       qb.andWhere('course.language = :language', { language });
     }
 
+    if (categoryId) {
+      qb.andWhere('course.categoryId = :categoryId', { categoryId });
+    } else if (category) {
+      // Filter by slug when a full UUID is not provided
+      qb.andWhere('category.slug = :categorySlug', { categorySlug: category });
+    }
+
     const total = await qb.clone().getCount();
     const offset = (page - 1) * limit;
 
@@ -68,6 +76,7 @@ export class CoursesService {
       .take(limit)
       .orderBy('course.createdAt', 'DESC')
       .groupBy('course.id')
+      .addGroupBy('category.id')
       .getRawAndEntities();
 
     const averageRatings = new Map(
@@ -91,7 +100,7 @@ export class CoursesService {
   async findOne(id: string): Promise<Course> {
     const course = await this.repo.findOne({
       where: { id, isDeleted: false },
-      relations: ['prerequisites', 'prerequisites.prerequisite'],
+      relations: ['prerequisites', 'prerequisites.prerequisite', 'category'],
     });
     if (!course) throw new NotFoundException('Course not found');
     return course;

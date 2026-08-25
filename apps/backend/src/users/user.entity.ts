@@ -71,6 +71,22 @@ export class User {
   @Column({ nullable: true, type: 'datetime' })
   lastActivityAt: Date | null;
 
+  /** #872: Set to true when the account is auto-deactivated due to inactivity. */
+  @Column({ default: false })
+  isDeactivated: boolean;
+
+  /** #872: Single-use token emailed to the user to reactivate their account. */
+  @Column({ nullable: true, type: 'varchar' })
+  deactivationToken: string | null;
+
+  /** #872: Expiry for the reactivation token (48-hour window). */
+  @Column({ nullable: true, type: 'datetime' })
+  deactivationTokenExpiresAt: Date | null;
+
+  /** #872: Timestamp when the inactivity warning email was sent. */
+  @Column({ nullable: true, type: 'datetime' })
+  deactivationNotifiedAt: Date | null;
+
   @Column({
     type: 'enum',
     enum: SubscriptionTier,
