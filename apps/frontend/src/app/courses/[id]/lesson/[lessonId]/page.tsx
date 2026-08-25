@@ -8,6 +8,7 @@ import { NotesPanel } from '@/components/courses/NotesPanel';
 import { ProgressTracker } from '@/components/courses/ProgressTracker';
 import { ChevronLeft, ChevronRight, Layout, BookOpen, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useVideoShortcuts } from '@/hooks/useVideoShortcuts';
 import { useSyncProgress } from '@/hooks/useSyncProgress';
 
@@ -19,6 +20,7 @@ export default function LessonPage() {
 
   const [lesson, setLesson] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isCompleting, setIsCompleting] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [sidebarTab, setSidebarTab] = useState<'transcript' | 'notes' | 'progress'>('transcript');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -59,7 +61,56 @@ export default function LessonPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center">Loading lesson...</div>;
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col" role="status" aria-label="Loading lesson">
+        {/* Header skeleton */}
+        <div className="bg-white dark:bg-gray-900 border-b dark:border-gray-800 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton height={36} width={130} variant="rectangular" className="rounded-lg" />
+            <Skeleton height={24} width={200} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton height={36} width={36} variant="rectangular" className="rounded-lg" />
+            <Skeleton height={36} width={36} variant="rectangular" className="rounded-lg" />
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Main content skeleton */}
+          <div className="flex-1 p-4 lg:p-8 space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* Video player skeleton */}
+              <Skeleton className="w-full aspect-video rounded-xl" />
+              {/* Description skeleton */}
+              <div className="space-y-3">
+                <Skeleton height={28} width="40%" />
+                <Skeleton height={16} className="w-full" />
+                <Skeleton height={16} width="92%" />
+                <Skeleton height={16} width="85%" />
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar skeleton */}
+          <div className="w-full lg:w-96 bg-white dark:bg-gray-900 border-t lg:border-t-0 lg:border-l dark:border-gray-800 p-4 space-y-3">
+            <div className="flex gap-0 border-b dark:border-gray-800">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex-1 py-3 px-2">
+                  <Skeleton height={20} className="w-full" />
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2 pt-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} height={14} width={`${70 + (i % 3) * 10}%`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
   if (!lesson) return <div className="p-8 text-center">Lesson not found.</div>;
 
   return (

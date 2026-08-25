@@ -25,6 +25,7 @@ import { BulkDeleteUserDto } from './dto/bulk-delete-user.dto';
 import { StellarService } from '../stellar/stellar.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/audit-log.entity';
+import { CertificatesService } from '../certificates/certificates.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -34,6 +35,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly stellarService: StellarService,
     private readonly auditService: AuditService,
+    private readonly certificatesService: CertificatesService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -116,6 +118,42 @@ export class UsersController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   getReferrals(@Param('id') id: string) {
     return this.usersService.getReferralStats(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/certificates')
+  @ApiOperation({ summary: 'Get all certificates earned by a user' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of certificates with course details',
+    schema: {
+      example: [
+        {
+          id: 'uuid',
+          courseId: 'uuid',
+          certificateHash: 'sha256hex',
+          stellarTransactionId: 'txhash',
+          status: 'minted',
+          issuedAt: '2026-06-02T10:00:00.000Z',
+          course: { id: 'uuid', title: 'Intro to Stellar' },
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — can only access own certificates unless admin' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getCertificates(
+    @Param('id') id: string,
+    @Request() req: { user: { id: string; role: string } },
+  ) {
+    // Students can only fetch their own certificates; admins can fetch any
+    if (req.user.id !== id && req.user.role !== 'admin') {
+      throw new ForbiddenException('You can only view your own certificates');
+    }
+    return this.certificatesService.getUserCertificates(id);
   }
 
   @UseGuards(JwtAuthGuard)
