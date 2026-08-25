@@ -20,9 +20,12 @@ import { KycVerification } from '@/components/profile/KycVerification';
 import { TwoFactorAuthentication } from '@/components/profile/TwoFactorAuthentication';
 import { NotificationSettings } from '@/components/profile/NotificationSettings';
 import { GdprSection } from '@/components/profile/GdprSection';
+import { CertificatesSection } from '@/components/profile/CertificatesSection';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useBookmarksStore } from '@/store/bookmarks.store';
 import { computeAchievements } from '@/app/profile/computeAchievements';
+import { useCertificates } from '@/hooks/useQueryHooks';
+import { ProfilePageSkeleton } from '@/components/ui/Skeleton';
 
 interface User {
   id: string;
@@ -63,6 +66,14 @@ export function ProfilePage() {
   const savedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const avatarObjectUrlRef = useRef<string | null>(null);
   const { bookmarks, fetchBookmarks } = useBookmarksStore();
+
+  // ── React Query: certificates ────────────────────────────────────────────
+  // Keyed on user.id — query is disabled until user is loaded.
+  const {
+    data: certificates = [],
+    isLoading: certificatesLoading,
+    error: certificatesError,
+  } = useCertificates(user?.id);
 
   const handleMfaStatusChange = useCallback((enabled: boolean) => {
     setUser((prev) => (prev ? { ...prev, mfaEnabled: enabled } : prev));
@@ -220,11 +231,9 @@ export function ProfilePage() {
 
   if (loading) {
     return (
-      <main className="max-w-2xl mx-auto p-8 text-gray-900 dark:text-gray-100">
-        <p role="status" aria-live="polite">
-          {t('loading')}
-        </p>
-      </main>
+      <ProtectedRoute>
+        <ProfilePageSkeleton />
+      </ProtectedRoute>
     );
   }
 
@@ -531,6 +540,13 @@ export function ProfilePage() {
 
         {/* Achievements Section */}
         {badges.length > 0 && <AchievementsSection badges={badges} />}
+
+        {/* Certificates Section */}
+        <CertificatesSection
+          certificates={certificates}
+          isLoading={certificatesLoading}
+          error={certificatesError instanceof Error ? certificatesError : certificatesError ? new Error(String(certificatesError)) : null}
+        />
 
         {/* Notification Settings */}
         <NotificationSettings />

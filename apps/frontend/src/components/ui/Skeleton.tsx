@@ -127,6 +127,72 @@ export const CourseDetailSkeleton: React.FC = () => {
   );
 };
 
+/**
+ * Full-page skeleton for the Profile page.
+ * Mirrors the shape of ProfilePage — avatar + name, edit form, wallet, certificates.
+ */
+export const ProfilePageSkeleton: React.FC = () => {
+  return (
+    <div className="max-w-2xl mx-auto p-8 space-y-8" aria-busy="true" role="status" aria-label="Loading profile">
+      {/* Header: avatar + name */}
+      <div className="flex items-center gap-4">
+        <Skeleton variant="circular" width={64} height={64} className="shrink-0" />
+        <div className="space-y-2 flex-1">
+          <Skeleton height={28} width="50%" />
+          <Skeleton height={16} width="70%" />
+        </div>
+      </div>
+
+      {/* Edit profile form */}
+      <div className="space-y-4">
+        <Skeleton height={24} width="35%" />
+        <div className="space-y-1">
+          <Skeleton height={16} width="20%" />
+          <Skeleton height={40} className="w-full" />
+        </div>
+        <div className="space-y-1">
+          <Skeleton height={16} width="10%" />
+          <Skeleton height={80} className="w-full" />
+        </div>
+        <Skeleton height={40} width={120} variant="rectangular" className="rounded-lg" />
+      </div>
+
+      {/* Wallet section */}
+      <div className="space-y-3">
+        <Skeleton height={24} width="30%" />
+        <div className="border rounded-xl p-4 space-y-3">
+          <Skeleton height={20} width="60%" />
+          <Skeleton height={40} className="w-full" />
+        </div>
+      </div>
+
+      {/* Certificates section */}
+      <div className="space-y-3">
+        <Skeleton height={24} width="25%" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="border rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <Skeleton variant="rectangular" width={36} height={36} className="rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton height={16} width="70%" />
+                  <Skeleton height={12} width="40%" />
+                </div>
+                <Skeleton height={20} width={64} variant="rectangular" className="rounded-full" />
+              </div>
+              <Skeleton height={12} width="90%" />
+              <div className="flex gap-2">
+                <Skeleton height={30} width={60} variant="rectangular" className="rounded-lg" />
+                <Skeleton height={30} width={130} variant="rectangular" className="rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const DashboardSkeleton: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8" aria-busy="true" role="status">

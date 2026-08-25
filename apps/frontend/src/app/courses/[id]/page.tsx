@@ -9,6 +9,7 @@ import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
 import { CourseForumTab } from '@/components/forum/CourseForumTab';
 import { WaitlistButton } from '@/components/courses/WaitlistButton';
 import { ProgressTracker } from '@/components/courses/ProgressTracker';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompareStore } from '@/store/compare.store';
 import api from '@/lib/api';
@@ -41,6 +42,8 @@ interface CourseModule {
   releaseDate?: string;
   lessons?: Lesson[];
 }
+
+interface Prerequisite {
   courseId: string;
   title: string;
   completed: boolean;
@@ -61,6 +64,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [prereqStatus, setPrereqStatus] = useState<PrerequisiteStatus | null>(null);
   const [prereqLoading, setPrereqLoading] = useState(true);
@@ -111,6 +115,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
     }
 
     const fetchModules = async () => {
+      setModulesLoading(true);
       try {
         const { data } = await api.get(`/courses/${courseId}/modules`);
         const modulesWithLessons = await Promise.all(
@@ -124,6 +129,8 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         if (user) await fetchProgress(modulesWithLessons);
       } catch (error) {
         console.error('Failed to fetch course curriculum:', error);
+      } finally {
+        setModulesLoading(false);
       }
     };
 
@@ -339,7 +346,31 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
           {user && !isInstructor && (
             <ProgressTracker courseId={courseId} />
           )}
-          {modules.map((mod) => {
+
+          {/* Module list skeleton while loading */}
+          {modulesLoading && (
+            <div className="space-y-4" role="status" aria-label="Loading course curriculum">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Skeleton variant="circular" width={20} height={20} className="shrink-0" />
+                    <Skeleton height={22} width="45%" />
+                  </div>
+                  <div className="space-y-2 pl-7">
+                    {Array.from({ length: 3 }).map((_, j) => (
+                      <div key={j} className="flex items-center gap-3">
+                        <Skeleton variant="circular" width={16} height={16} className="shrink-0" />
+                        <Skeleton height={16} width={`${55 + j * 10}%`} />
+                        <Skeleton height={14} width={60} className="ml-auto shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!modulesLoading && modules.map((mod) => {
             const modProgress = moduleProgress[mod.id];
             const isModuleCompleted = modProgress?.completed ?? false;
 

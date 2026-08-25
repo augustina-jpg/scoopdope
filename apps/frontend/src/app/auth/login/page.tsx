@@ -8,8 +8,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
-import { Input } from '@/components/ui/Input';
+import { FormField } from '@/components/ui/FormField';
 import { Button } from '@/components/ui/Button';
+import { ButtonSpinner } from '@/components/ui/Spinner';
 
 interface LoginResponse {
   access_token?: string;
@@ -36,8 +37,12 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+    formState: { errors, isValid, touchedFields },
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    // Validate on change AND blur — errors appear as soon as the user types
+    mode: 'onChange',
+  });
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
@@ -88,8 +93,10 @@ export default function LoginPage() {
       login(res.data.access_token, profileResponse.data);
       setIsLoading(false);
       router.push('/dashboard');
-    } catch (err: any) {
-      const message = err?.response?.data?.message ?? err?.message;
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (err instanceof Error ? err.message : 'Invalid credentials');
       setApiError(typeof message === 'string' ? message : 'Invalid credentials');
       setIsLoading(false);
     }
@@ -101,33 +108,36 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sign in</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
-          <Input
+          <FormField
             label="Email"
             type="email"
             autoComplete="email"
             error={errors.email?.message}
+            success={!errors.email && touchedFields.email ? 'Looks good!' : undefined}
+            required
             {...register('email')}
           />
-          <Input
+
+          <FormField
             label="Password"
             type="password"
             autoComplete="current-password"
             error={errors.password?.message}
-            {...register('password')}
+            required
             disabled={awaitingMfa}
+            {...register('password')}
           />
 
           {awaitingMfa && (
             <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200">
               <p className="font-medium">Two-factor authentication required</p>
               <p>Enter the code from your authenticator app or a backup recovery code to continue.</p>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">MFA Code</label>
-              <input
+              <FormField
+                label="MFA Code"
                 type="text"
                 value={mfaToken}
-                onChange={(e) => setMfaToken(e.target.value.trim())}
+                onChange={(e) => setMfaToken((e.target as HTMLInputElement).value.trim())}
                 placeholder="123456"
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 disabled={isLoading}
               />
               <button
@@ -144,7 +154,12 @@ export default function LoginPage() {
             </div>
           )}
 
-          {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
+          {/* API-level error (wrong credentials, server error, etc.) */}
+          {apiError && (
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {apiError}
+            </p>
+          )}
 
           <div className="text-right -mt-2">
             <Link
@@ -155,22 +170,24 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <Button type="submit" disabled={isLoading} className="w-full mt-2">
+          {/*
+            Disabled conditions:
+              1. isLoading — network request in flight
+              2. !isValid  — zod schema fails (email invalid, password empty)
+            For MFA step we skip isValid check since the extra mfaToken field
+            isn't part of the react-hook-form schema.
+          */}
+          <Button
+            type="submit"
+            disabled={isLoading || (!awaitingMfa && !isValid)}
+            className="w-full mt-2"
+            aria-describedby={apiError ? 'login-api-error' : undefined}
+          >
             {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Signing in…
-              </span>
+              <>
+                <ButtonSpinner />
+                {awaitingMfa ? 'Verifying…' : 'Signing in…'}
+              </>
             ) : (
               awaitingMfa ? 'Verify code' : 'Sign in'
             )}

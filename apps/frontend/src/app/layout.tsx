@@ -5,6 +5,7 @@ import NetworkStatus from '@/components/ui/NetworkStatus';
 import { TourProvider } from '@/components/ui/TourProvider';
 import { BottomMobileNav } from '@/components/layout/MobileNav';
 import { Navbar } from '@/components/layout/Navbar';
+import { ReactQueryProvider } from '@/components/ReactQueryProvider';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://scoopdope.app';
 
@@ -38,14 +39,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <TourProvider>
-          <Navbar />
-          {/* pb-16 reserves space for the bottom tab bar on mobile */}
-          <main className="pb-16 lg:pb-0">{children}</main>
-          <BottomMobileNav />
-        </TourProvider>
-        <NetworkStatus />
-        <WalletButton />
+        <ReactQueryProvider>
+          <TourProvider>
+            <Navbar />
+            {/* pb-16 reserves space for the bottom tab bar on mobile */}
+            <main className="pb-16 lg:pb-0">{children}</main>
+            <BottomMobileNav />
+          </TourProvider>
+          <NetworkStatus />
+          <WalletButton />
+        </ReactQueryProvider>
       </body>
     </html>
   );
