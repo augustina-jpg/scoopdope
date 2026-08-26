@@ -22,6 +22,24 @@ export class CoursesService {
     private readonly metricsService: MetricsService
   ) {}
 
+  /**
+   * Get average rating for a course from reviews
+   */
+  async getAverageRating(courseId: string): Promise<number | null> {
+    const course = await this.repo
+      .createQueryBuilder('course')
+      .leftJoinAndSelect('course.reviews', 'review')
+      .where('course.id = :courseId', { courseId })
+      .getOne();
+
+    if (!course || !course.reviews || course.reviews.length === 0) {
+      return null;
+    }
+
+    const sum = course.reviews.reduce((acc, review) => acc + (review.rating || 0), 0);
+    return parseFloat((sum / course.reviews.length).toFixed(2));
+  }
+
   async findAll(query: CourseQueryDto = {}) {
     const { search, level, language, page = 1, limit = 20 } = query;
 
@@ -151,5 +169,103 @@ export class CoursesService {
     course.scheduledAt = course.scheduledAt ?? null;
 
     return this.repo.save(course);
+  }
+
+  /**
+   * Find a course by ID without the published-only filter — used by admin operations.
+   */
+  async findOneAdmin(id: string): Promise<Course> {
+    const course = await this.repo.findOne({
+      where: { id, isDeleted: false },
+      relations: ['instructor'],
+    });
+    if (!course) throw new NotFoundException('Course not found');
+    return course;
+  }
+
+  /**
+   * Admin list — returns all courses regardless of status, with optional filters.
+   * Also surfaces enrollment counts via a subquery.
+   */
+  async findAllAdmin(options: {
+    status?: CourseStatus;
+    instructorId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}) {
+    const { status, instructorId, search, page = 1, limit = 20 } = options;
+
+    const qb = this.repo
+      .createQueryBuilder('course')
+      .where('course.isDeleted = :isDeleted', { isDeleted: false })
+      .leftJoinAndSelect('course.instructor', 'instructor')
+      .loadRelationCountAndMap('course.enrollmentCount', 'course.modules', 'modules');
+
+    if (status) {
+      qb.andWhere('course.status = :status', { status });
+    }
+
+    if (instructorId) {
+      qb.andWhere('course.instructorId = :instructorId', { instructorId });
+    }
+
+    if (search) {
+      qb.andWhere(
+        '(course.title ILIKE :search OR course.description ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    const total = await qb.clone().getCount();
+    const data = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .orderBy('course.createdAt', 'DESC')
+      .getMany();
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /** Approve a pending course — moves it to PUBLISHED. */
+  async approveCourse(id: string): Promise<Course> {
+    const course = await this.findOneAdmin(id);
+    const now = new Date();
+    const updated = await this.repo.save({
+      ...course,
+      status: CourseStatus.PUBLISHED,
+      isPublished: true,
+      publishedAt: course.publishedAt ?? now,
+    });
+    await this.invalidateCache();
+    return updated;
+  }
+
+  /** Archive a course — moves any non-deleted course to ARCHIVED. */
+  async archiveCourse(id: string): Promise<{ course: Course; previousStatus: CourseStatus }> {
+    const course = await this.findOneAdmin(id);
+    const previousStatus = course.status;
+    const updated = await this.repo.save({
+      ...course,
+      status: CourseStatus.ARCHIVED,
+      isPublished: false,
+    });
+    await this.invalidateCache();
+    return { course: updated, previousStatus };
+  }
+
+  /** Unarchive a course — restores it to PUBLISHED. */
+  async unarchiveCourse(id: string): Promise<Course> {
+    const course = await this.findOneAdmin(id);
+    const updated = await this.repo.save({
+      ...course,
+      status: CourseStatus.PUBLISHED,
+      isPublished: true,
+    });
+    await this.invalidateCache();
+    return updated;
   }
 }

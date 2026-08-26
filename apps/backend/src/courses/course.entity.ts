@@ -15,7 +15,9 @@ import { CoursePrerequisite } from './course-prerequisite.entity';
 export enum CourseStatus {
   DRAFT = 'draft',
   SCHEDULED = 'scheduled',
+  PENDING = 'pending',
   PUBLISHED = 'published',
+  ARCHIVED = 'archived',
 }
 
 @Entity('courses')

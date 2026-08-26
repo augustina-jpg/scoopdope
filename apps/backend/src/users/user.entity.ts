@@ -6,6 +6,12 @@ export enum SubscriptionTier {
   ENTERPRISE = 'enterprise',
 }
 
+export enum UserStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  DEACTIVATED = 'deactivated',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -34,6 +40,13 @@ export class User {
 
   @Column({ default: false })
   isBanned: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: UserStatus,
+    default: UserStatus.ACTIVE,
+  })
+  status: UserStatus;
 
   @Column({ default: false })
   isVerified: boolean;

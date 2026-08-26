@@ -7,6 +7,7 @@ import { CoursesService } from './courses.service';
 import { ModulesService } from './modules.service';
 import { LessonsService } from './lessons.service';
 import { CoursesController } from './courses.controller';
+import { AdminCoursesController } from './admin-courses.controller';
 import { ModulesController } from './modules.controller';
 import { Review } from './review.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
@@ -25,6 +26,8 @@ import { TranscribeService } from './transcribe.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { User } from '../users/user.entity';
+import { AuditModule } from '../audit/audit.module';
+import { EnrollmentsModule } from '../enrollments/enrollments.module';
 
 @Module({
   imports: [
@@ -32,9 +35,11 @@ import { User } from '../users/user.entity';
     SearchModule,
     NotificationsModule,
     MetricsModule,
+    AuditModule,
+    EnrollmentsModule,
   ],
   providers: [CoursesService, ModulesService, LessonsService, ReviewsService, CourseVersioningService, PrerequisitesService, CourseSchedulerService, DripSchedulerService, TranscribeService],
-  controllers: [CoursesController, ModulesController, ReviewsController, CourseVersioningController, PrerequisitesController],
-  exports: [CoursesService, PrerequisitesService],
+  controllers: [CoursesController, AdminCoursesController, ModulesController, ReviewsController, CourseVersioningController, PrerequisitesController],
+  exports: [CoursesService, PrerequisitesService, EnrollmentsModule],
 })
 export class CoursesModule {}
