@@ -12,6 +12,7 @@ import { TokenBalanceWidget } from '@/components/dashboard/TokenBalanceWidget';
 import { CheckCircle2 } from 'lucide-react';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { useOnboardingStore } from '@/store/onboarding.store';
+import BadgeDisplay, { type BadgeProgress } from '@/components/profile/BadgeDisplay';
 
 interface UserData {
   id: string;
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   const [bundleEnrollments, setBundleEnrollments] = useState<any[]>([]);
   const [pathEnrollments, setPathEnrollments] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [badges, setBadges] = useState<BadgeProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,17 +88,19 @@ export default function DashboardPage() {
           throw new Error('User information is missing.');
         }
 
-        const [progressRes, credRes, bundlesRes, pathsRes, recsRes] = await Promise.all([
+        const [progressRes, credRes, bundlesRes, pathsRes, recsRes, badgesRes] = await Promise.all([
           api.get(`/users/${currentUser.id}/progress`),
           api.get(`/credentials/${currentUser.id}`),
           api.get('/bundles/user/me'),
           api.get('/learning-paths/user/me'),
           api.get('/v1/recommendations?limit=5').catch(() => ({ data: { data: [] } })),
+          api.get('/v1/badges/me').catch(() => ({ data: [] })),
         ]);
 
         setBundleEnrollments(bundlesRes.data ?? []);
         setPathEnrollments(pathsRes.data ?? []);
         setRecommendations(recsRes.data?.data ?? []);
+        setBadges(badgesRes.data ?? []);
 
         const progressRecords: ProgressRecord[] = (progressRes.data ?? []).map((p: any) => ({
           id: p.id,
@@ -201,6 +205,16 @@ export default function DashboardPage() {
             </h2>
             <TokenBalanceWidget stellarPublicKey={state.user?.stellarPublicKey} />
           </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Badges</h2>
+            <Link href="/profile" className="text-sm font-medium text-blue-600 hover:underline">
+              {badges.filter((badge) => badge.earned).length} earned
+            </Link>
+          </div>
+          <BadgeDisplay badges={badges.filter((badge) => badge.earned)} loading={isLoading} />
         </section>
 
         {bundleEnrollments.length > 0 && (
