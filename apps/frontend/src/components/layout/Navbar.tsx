@@ -8,6 +8,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { ConnectionStatus } from '@/components/ui/ConnectionStatus';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -51,6 +52,7 @@ export function Navbar() {
           )}
           <LanguageSwitcher />
           <ThemeToggle />
+          <ConnectionStatus />
           {isAuthenticated && user ? (
             <div className="flex items-center gap-2">
               {/* Notification bell */}
