@@ -24,6 +24,7 @@ export default function CoursesPage() {
 
   const {
     query, setQuery, level, language, category, duration, price, sort, dq,
+    instructor, minRating, enrollmentRange, dateRange,
     applyFilter, clearAll, activeFilters,
     courses, error, isLoading, isLoadingMore, hasMore, size, setSize,
   } = useCoursesFilter();
@@ -79,7 +80,7 @@ export default function CoursesPage() {
           </svg>
         </div>
 
-        <CourseFilters level={level} language={language} category={category} duration={duration} price={price} sort={sort} onChange={applyFilter} />
+        <CourseFilters level={level} language={language} category={category} duration={duration} price={price} sort={sort} instructor={instructor} minRating={minRating} enrollmentRange={enrollmentRange} dateRange={dateRange} onChange={applyFilter} />
 
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap gap-2 items-center">

@@ -10,6 +10,7 @@ export enum NotificationType {
   ANNOUNCEMENT = 'announcement',
   WAITLIST_JOINED = 'waitlist_joined',
   WAITLIST_ENROLLED = 'waitlist_enrolled',
+  SUPPORT_TICKET_UPDATE = 'support_ticket_update',
 }
 
 @Entity('notifications')

@@ -35,6 +35,7 @@ import { ApiUsageModule } from './api-usage/api-usage.module';
 import { ApiUsageInterceptor } from './api-usage/api-usage.interceptor';
 import { QuizzesModule } from './quizzes/quizzes.module';
 import { CohortsModule } from './cohorts/cohorts.module';
+import { SupportTicketsModule } from './support-tickets/support-tickets.module';
 import { CdnModule } from './cdn/cdn.module';
 import { AccessControlModule } from './access-control/access-control.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
@@ -151,6 +152,7 @@ import { validationSchema } from './config/validation.schema';
     ApiUsageModule,
     QuizzesModule,
     CohortsModule,
+    SupportTicketsModule,
     CdnModule,
     AccessControlModule,
     RateLimitModule,

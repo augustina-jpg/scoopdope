@@ -23,11 +23,45 @@ export class CoursesService {
   ) {}
 
   async findAll(query: CourseQueryDto = {}) {
-    const { search, level, language, page = 1, limit = 20 } = query;
+    const {
+      search,
+      level,
+      language,
+      page = 1,
+      limit = 20,
+      instructor,
+      minRating,
+      minEnrollments,
+      maxEnrollments,
+      publishedAfter,
+      publishedBefore,
+      durationMin,
+      durationMax,
+      priceMin,
+      priceMax,
+      sort,
+    } = query;
 
     // Cache key encodes all filter params; skip cache for search queries
     const cacheKey = !search
-      ? `courses:catalog:${level ?? ''}:${language ?? ''}:${page}:${limit}`
+      ? [
+          'courses:catalog',
+          level ?? '',
+          language ?? '',
+          instructor ?? '',
+          minRating ?? '',
+          minEnrollments ?? '',
+          maxEnrollments ?? '',
+          publishedAfter ?? '',
+          publishedBefore ?? '',
+          durationMin ?? '',
+          durationMax ?? '',
+          priceMin ?? '',
+          priceMax ?? '',
+          sort ?? '',
+          page,
+          limit,
+        ].join(':')
       : null;
 
     if (cacheKey) {
@@ -58,25 +92,103 @@ export class CoursesService {
       qb.andWhere('course.language = :language', { language });
     }
 
+    if (instructor) {
+      qb.leftJoin('course.instructor', 'instructor').andWhere(
+        'instructor.username ILIKE :instructor',
+        { instructor: `%${instructor}%` },
+      );
+    }
+
+    if (publishedAfter) {
+      qb.andWhere('course.publishedAt >= :publishedAfter', {
+        publishedAfter: new Date(publishedAfter),
+      });
+    }
+
+    if (publishedBefore) {
+      qb.andWhere('course.publishedAt <= :publishedBefore', {
+        publishedBefore: new Date(publishedBefore),
+      });
+    }
+
+    if (durationMin !== undefined) {
+      qb.andWhere('course.durationHours >= :durationMin', { durationMin });
+    }
+
+    if (durationMax !== undefined) {
+      qb.andWhere('course.durationHours <= :durationMax', { durationMax });
+    }
+
+    if (priceMin !== undefined) {
+      qb.andWhere('course.priceUsd >= :priceMin', { priceMin });
+    }
+
+    if (priceMax !== undefined) {
+      if (priceMax === 0) {
+        qb.andWhere('(course.priceUsd IS NULL OR course.priceUsd = 0)');
+      } else {
+        qb.andWhere('(course.priceUsd IS NULL OR course.priceUsd <= :priceMax)', { priceMax });
+      }
+    }
+
+    if (minEnrollments !== undefined) {
+      qb.andWhere(
+        '(SELECT COUNT(e.id) FROM enrollments e WHERE e."courseId" = course.id) >= :minEnrollments',
+        { minEnrollments },
+      );
+    }
+
+    if (maxEnrollments !== undefined) {
+      qb.andWhere(
+        '(SELECT COUNT(e.id) FROM enrollments e WHERE e."courseId" = course.id) <= :maxEnrollments',
+        { maxEnrollments },
+      );
+    }
+
     const total = await qb.clone().getCount();
     const offset = (page - 1) * limit;
 
-    const { raw, entities } = await qb
-      .leftJoin('course.reviews', 'review')
+    // Always select the enrollment count subquery so we can sort by it when needed
+    qb.leftJoin('course.reviews', 'review')
       .addSelect('COALESCE(AVG(review.rating), 0)', 'course_averageRating')
+      .addSelect(
+        '(SELECT COUNT(e.id) FROM enrollments e WHERE e."courseId" = course.id)',
+        'enrollment_count',
+      )
       .skip(offset)
       .take(limit)
-      .orderBy('course.createdAt', 'DESC')
-      .groupBy('course.id')
-      .getRawAndEntities();
+      .groupBy('course.id');
 
-    const averageRatings = new Map(
-      raw.map((item, index) => [entities[index].id, Number(item.course_averageRating) || 0])
+    if (minRating !== undefined) {
+      qb.having('COALESCE(AVG(review.rating), 0) >= :minRating', { minRating });
+    }
+
+    // Apply sort order
+    if (sort === 'oldest') {
+      qb.orderBy('course.createdAt', 'ASC');
+    } else if (sort === 'popular') {
+      qb.orderBy('enrollment_count', 'DESC');
+    } else if (sort === 'rating') {
+      qb.orderBy('course_averageRating', 'DESC');
+    } else {
+      // Default: newest
+      qb.orderBy('course.createdAt', 'DESC');
+    }
+
+    const { raw, entities } = await qb.getRawAndEntities();
+
+    const ratingMap = new Map(
+      raw.map((item, index) => [entities[index].id, Number(item.course_averageRating) || 0]),
+    );
+
+    const enrollmentCountMap = new Map(
+      raw.map((item, index) => [entities[index].id, Number(item.enrollment_count) || 0]),
     );
 
     const data = entities.map((course) => ({
       ...course,
-      averageRating: averageRatings.get(course.id) ?? 0,
+      averageRating: ratingMap.get(course.id) ?? 0,
+      enrollmentCount: enrollmentCountMap.get(course.id) ?? 0,
     }));
 
     const result = { data, total, page, limit };
