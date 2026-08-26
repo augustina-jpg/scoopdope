@@ -47,6 +47,7 @@ import { PayoutsModule } from './payouts/payouts.module';
 import { InstructorApplicationsModule } from './instructor-applications/instructor-applications.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { StreaksModule } from './streaks/streaks.module';
+import { StudySessionsModule } from './study-sessions/study-sessions.module';
 import { BundlesModule } from './bundles/bundles.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { LiveSessionsModule } from './live-sessions/live-sessions.module';
@@ -160,6 +161,7 @@ import { validationSchema } from './config/validation.schema';
     AnnouncementsModule,
     AssignmentsModule,
     StreaksModule,
+    StudySessionsModule,
     BundlesModule,
     SubscriptionsModule,
     LiveSessionsModule,

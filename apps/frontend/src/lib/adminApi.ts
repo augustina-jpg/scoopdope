@@ -54,6 +54,7 @@ export interface TopCourse {
 
 export interface PlatformAnalytics {
   totalUsers: number;
+  totalCourses: number;
   totalEnrollments: number;
   totalCompletions: number;
   totalRevenue: number;
@@ -63,6 +64,7 @@ export interface PlatformAnalytics {
   completionGrowth: GrowthPoint[];
   revenueGrowth: RevenuePoint[];
   topCourses: TopCourse[];
+  enrollmentByCourse: { courseId: string; title: string; enrollments: number }[];
 }
 
 export const adminApi = {
@@ -78,6 +80,8 @@ export const adminApi = {
   rejectCourse: (courseId: string, reason: string) =>
     api.post(`/admin/courses/${courseId}/reject`, { reason }).then((r) => r.data),
   getHealth: () => api.get<HealthStatus>('/health').then((r) => r.data),
-  getPlatformAnalytics: () =>
-    api.get<PlatformAnalytics>('/v1/analytics/platform').then((r) => r.data),
+  getPlatformAnalytics: (params?: { from?: string; to?: string }) =>
+    api
+      .get<PlatformAnalytics>('/v1/analytics/platform', { params })
+      .then((r) => r.data),
 };

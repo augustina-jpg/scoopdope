@@ -12,6 +12,7 @@ import { TokenBalanceWidget } from '@/components/dashboard/TokenBalanceWidget';
 import { CheckCircle2 } from 'lucide-react';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { useOnboardingStore } from '@/store/onboarding.store';
+import { UserActivityDashboard } from '@/components/dashboard/UserActivityDashboard';
 
 interface UserData {
   id: string;
@@ -373,6 +374,11 @@ export default function DashboardPage() {
               ))
             )}
           </div>
+        </section>
+
+        {/* #883: User Activity Dashboard */}
+        <section>
+          <UserActivityDashboard />
         </section>
       </main>
     </ProtectedRoute>
