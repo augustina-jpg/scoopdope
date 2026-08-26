@@ -22,7 +22,7 @@ import { NotificationSettings } from '@/components/profile/NotificationSettings'
 import { GdprSection } from '@/components/profile/GdprSection';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useBookmarksStore } from '@/store/bookmarks.store';
-import { computeAchievements } from '@/app/profile/computeAchievements';
+import BadgeDisplay, { type BadgeProgress } from './BadgeDisplay';
 
 interface User {
   id: string;
@@ -39,6 +39,7 @@ interface User {
   subscriptionTier?: 'free' | 'pro' | 'enterprise';
   subscriptionExpiresAt?: string;
   mfaEnabled?: boolean;
+  leaderboardOptOut?: boolean;
 }
 
 interface FormData {
@@ -59,7 +60,9 @@ export function ProfilePage() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [badges, setBadges] = useState<any[]>([]);
+  const [badges, setBadges] = useState<BadgeProgress[]>([]);
+  const [leaderboardOptOut, setLeaderboardOptOut] = useState(false);
+  const [savingLeaderboardPreference, setSavingLeaderboardPreference] = useState(false);
   const savedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const avatarObjectUrlRef = useRef<string | null>(null);
   const { bookmarks, fetchBookmarks } = useBookmarksStore();
@@ -79,6 +82,7 @@ export function ProfilePage() {
         setError(null);
         const response = await api.get('/users/me');
         setUser(response.data);
+        setLeaderboardOptOut(Boolean(response.data.leaderboardOptOut));
         setForm({
           username: response.data.username,
           bio: response.data.bio ?? '',
@@ -95,27 +99,12 @@ export function ProfilePage() {
     fetchUser();
   }, [t]);
 
-  // Fetch badges and achievements when user changes
+  // Fetch persisted badges when user changes
   useEffect(() => {
     if (!user) return;
-
-    const creds = api.get(`/credentials/${user.id}`).then((r) => r.data).catch(() => []);
-    const progress = api.get(`/users/${user.id}/progress`).then((r) => r.data).catch(() => []);
-    const bst = user.stellarPublicKey
-      ? api
-          .get(`/stellar/balance/${user.stellarPublicKey}`)
-          .then((r) => {
-            const b = r.data.balances?.find((b: any) => b.asset_code === 'BST');
-            return parseFloat(b?.balance ?? '0');
-          })
-          .catch(() => 0)
-      : Promise.resolve(0);
-
-    Promise.all([creds, progress, bst]).then(([credentials, progressRecords, bstBalance]) => {
-      const credentialCount = Array.isArray(credentials) ? credentials.length : 0;
-      const input = { credentialCount, bstBalance: Number(bstBalance), progressRecords };
-      setBadges(computeAchievements(input));
-    });
+    api.get('/v1/badges/me')
+      .then((response) => setBadges(response.data ?? []))
+      .catch(() => setBadges([]));
   }, [user]);
 
   // Cleanup timeout and object URL on unmount
@@ -216,6 +205,18 @@ export function ProfilePage() {
 
   const onWalletUnlinked = useCallback(() => {
     setUser((prev: User | null) => (prev ? { ...prev, stellarPublicKey: undefined } : null));
+  }, []);
+
+  const handleLeaderboardPreference = useCallback(async (optOut: boolean) => {
+    setSavingLeaderboardPreference(true);
+    try {
+      await api.patch('/v1/leaderboards/preference', { optOut });
+      setLeaderboardOptOut(optOut);
+    } catch {
+      toast.error('Unable to update leaderboard preference');
+    } finally {
+      setSavingLeaderboardPreference(false);
+    }
   }, []);
 
   if (loading) {
@@ -529,8 +530,22 @@ export function ProfilePage() {
         {/* KYC Verification */}
         <KycVerification stellarPublicKey={user.stellarPublicKey} />
 
+        <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+          <label htmlFor="leaderboard-opt-out" className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              id="leaderboard-opt-out"
+              type="checkbox"
+              checked={leaderboardOptOut}
+              disabled={savingLeaderboardPreference}
+              onChange={(event) => handleLeaderboardPreference(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Hide me from anonymous leaderboards
+          </label>
+        </section>
+
         {/* Achievements Section */}
-        {badges.length > 0 && <AchievementsSection badges={badges} />}
+        {badges.length > 0 && <BadgeDisplay badges={badges} />}
 
         {/* Notification Settings */}
         <NotificationSettings />
@@ -539,27 +554,5 @@ export function ProfilePage() {
         <GdprSection userId={user.id} />
       </main>
     </ProtectedRoute>
-  );
-}
-
-interface AchievementsSectionProps {
-  badges: any[];
-}
-
-function AchievementsSection({ badges }: AchievementsSectionProps) {
-  const t = useTranslations('profile');
-
-  return (
-    <section className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('achievements', 'Achievements')}</h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {badges.map((badge, idx) => (
-          <div key={idx} className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-2xl">{badge.icon || '🏆'}</div>
-            <span className="text-sm font-medium text-center text-gray-900 dark:text-gray-100">{badge.title}</span>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }

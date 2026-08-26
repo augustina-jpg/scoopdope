@@ -68,6 +68,9 @@ export class User {
   @Column({ default: 0 })
   longestStreak: number;
 
+  @Column({ default: false })
+  leaderboardOptOut: boolean;
+
   @Column({ nullable: true, type: 'datetime' })
   lastActivityAt: Date | null;
 
