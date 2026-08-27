@@ -51,6 +51,7 @@ import { BundlesModule } from './bundles/bundles.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { LiveSessionsModule } from './live-sessions/live-sessions.module';
 import { PaymentsModule } from './payments/payments.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 import * as redisStore from 'cache-manager-redis-store';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import configuration from './config/configuration';
@@ -165,6 +166,7 @@ import { validationSchema } from './config/validation.schema';
     LiveSessionsModule,
     PaymentsModule,
     ApiVersionModule,
+    MonitoringModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

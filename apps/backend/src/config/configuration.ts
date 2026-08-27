@@ -114,4 +114,10 @@ export default () => ({
   payouts: {
     batchSize: parseInt(process.env.PAYOUT_BATCH_SIZE ?? '500', 10),
   },
+
+  monitoring: {
+    slowQueryThreshold: parseInt(process.env.MONITORING_SLOW_QUERY_THRESHOLD || '1000', 10),
+    criticalQueryThreshold: parseInt(process.env.MONITORING_CRITICAL_QUERY_THRESHOLD || '5000', 10),
+    slowQueryLogPath: process.env.MONITORING_SLOW_QUERY_LOG_PATH || 'logs/slow-queries.log',
+  },
 });
