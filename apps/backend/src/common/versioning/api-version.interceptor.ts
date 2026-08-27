@@ -33,25 +33,46 @@ export class ApiVersionInterceptor implements NestInterceptor {
       this.reflector.get<ApiVersion>(RESOLVED_VERSION_KEY, context.getHandler()) ??
       DEFAULT_API_VERSION;
 
+    // Always set the current API version being used
     response.setHeader(X_API_VERSION, version);
 
     const info = getVersionInfo(version);
+
+    // If the version is deprecated, set deprecation headers
     if (info.deprecationDate && info.deprecationDate <= new Date()) {
-      response.setHeader(X_API_DEPRECATED, `true; deprecation_date=${info.deprecationDate.toISOString()}`);
+      response.setHeader(
+        X_API_DEPRECATED,
+        `true; deprecation_date=${info.deprecationDate.toISOString()}`
+      );
+
       if (info.sunsetDate) {
         response.setHeader(X_API_SUNSET, info.sunsetDate.toISOString());
       }
     }
 
-    const acceptVersion = request.headers[API_VERSION_HEADER.toLowerCase()];
-    if (acceptVersion && acceptVersion !== version) {
-      response.setHeader('Warning', `299 - Requested version "${acceptVersion}" is not available; using "${version}"`);
+    // If client requested a different version (from header or Accept param), warn them
+    const requestedVersionFromHeader = request.metadata?.requestedVersionFromHeader;
+    if (requestedVersionFromHeader && requestedVersionFromHeader !== version) {
+      response.setHeader(
+        'Warning',
+        `299 - Requested version "${requestedVersionFromHeader}" is not available; using "${version}"`
+      );
+    }
+
+    // Check Accept-Version header as fallback for warning
+    const acceptVersionHeader = request.headers[API_VERSION_HEADER.toLowerCase()];
+    if (acceptVersionHeader && !requestedVersionFromHeader && acceptVersionHeader !== version) {
+      response.setHeader(
+        'Warning',
+        `299 - Requested version "${acceptVersionHeader}" is not available; using "${version}"`
+      );
     }
 
     return next.handle().pipe(
       map((data: any) => {
+        // Optionally enrich response with version info (can be disabled if not needed)
         if (data && typeof data === 'object' && !Array.isArray(data)) {
-          return { ...data, apiVersion: version };
+          return { ...data, _api: { version } };
         }
         return data;
       })

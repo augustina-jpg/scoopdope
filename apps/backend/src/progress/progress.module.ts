@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Progress } from './progress.entity';
 import { ProgressService } from './progress.service';
+import { ProgressExportService } from './progress-export.service';
 import { ProgressController } from './progress.controller';
 import { StellarModule } from '../stellar/stellar.module';
 import { CredentialsModule } from '../credentials/credentials.module';
@@ -9,10 +10,12 @@ import { UsersModule } from '../users/users.module';
 import { StreaksModule } from '../streaks/streaks.module';
 import { BundlesModule } from '../bundles/bundles.module';
 import { MetricsModule } from '../metrics/metrics.module';
+import { Enrollment } from '../enrollments/enrollment.entity';
+import { Course } from '../courses/course.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Progress]),
+    TypeOrmModule.forFeature([Progress, Enrollment, Course]),
     StellarModule,
     CredentialsModule,
     UsersModule,
@@ -20,7 +23,8 @@ import { MetricsModule } from '../metrics/metrics.module';
     BundlesModule,
     MetricsModule,
   ],
-  providers: [ProgressService],
+  providers: [ProgressService, ProgressExportService],
   controllers: [ProgressController],
+  exports: [ProgressExportService],
 })
 export class ProgressModule {}
