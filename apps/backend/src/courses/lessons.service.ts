@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not } from 'typeorm';
 import { Lesson } from './lesson.entity';
 import { SearchService } from '../search/search.service';
 import { TranscribeService } from './transcribe.service';
 import { Interval } from '@nestjs/schedule';
+import { Course } from './course.entity';
 
 @Injectable()
 export class LessonsService {
@@ -12,6 +13,7 @@ export class LessonsService {
 
   constructor(
     @InjectRepository(Lesson) private repo: Repository<Lesson>,
+    @InjectRepository(Course) private courseRepo: Repository<Course>,
     private readonly searchService: SearchService,
     private readonly transcribeService: TranscribeService,
   ) {}
@@ -91,5 +93,56 @@ export class LessonsService {
     if (!lesson) throw new NotFoundException('Lesson not found');
     await this.searchService.deleteFromIndex('lessons', id).catch(() => {});
     return this.repo.remove(lesson);
+  }
+
+  /**
+   * Validates that an instructor teaches the course containing a lesson.
+   * @param lessonId - The ID of the lesson
+   * @param instructorId - The ID of the instructor
+   * @returns The lesson if validation passes
+   * @throws NotFoundException if lesson doesn't exist
+   * @throws ForbiddenException if instructor doesn't teach the course
+   */
+  async validateInstructorOwnsLesson(lessonId: string, instructorId: string): Promise<Lesson> {
+    const lesson = await this.repo.findOne({
+      where: { id: lessonId },
+      relations: ['module', 'module.course', 'module.course.instructor'],
+    });
+
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found');
+    }
+
+    // Check if instructor teaches the course
+    if (lesson.module?.course?.instructorId !== instructorId) {
+      throw new ForbiddenException('You do not teach the course containing this lesson');
+    }
+
+    return lesson;
+  }
+
+  /**
+   * Updates lesson content with validation.
+   * @param id - The ID of the lesson
+   * @param instructorId - The ID of the instructor performing the update
+   * @param data - Partial lesson data to update
+   * @returns The updated lesson
+   * @throws NotFoundException if lesson doesn't exist
+   * @throws ForbiddenException if instructor doesn't teach the course
+   */
+  async updateContent(id: string, instructorId: string, data: Partial<Lesson>) {
+    // Validate instructor ownership
+    const lesson = await this.validateInstructorOwnsLesson(id, instructorId);
+
+    // Update allowed fields only
+    const updateData: Partial<Lesson> = {};
+    if (data.content !== undefined) updateData.content = data.content;
+    if (data.learningObjectives !== undefined) updateData.learningObjectives = data.learningObjectives;
+    if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes;
+
+    const updated = await this.repo.save({ ...lesson, ...updateData });
+    await this.searchService.indexLesson(updated).catch(() => {});
+
+    return updated;
   }
 }
