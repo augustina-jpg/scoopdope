@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, VERSION_NEUTRAL } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   HealthCheckService,
@@ -16,6 +16,7 @@ import { DataSource } from 'typeorm';
 import { Logger } from 'winston';
 import { ConfigService } from '@nestjs/config';
 import { HealthService } from './health.service';
+import { DatabasePoolService } from '../database/database-pool.service';
 import {
   DiskHealthIndicator,
   ElasticsearchHealthIndicator,
@@ -41,6 +42,7 @@ export class HealthController {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
     private readonly configService: ConfigService,
+    @Optional() private readonly databasePool?: DatabasePoolService,
   ) {}
 
   @Get()
@@ -174,6 +176,13 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Version information retrieved' })
   async checkVersion() {
     return this.healthService.getSystemInfo();
+  }
+
+  @Get('database/pool')
+  @ApiOperation({ summary: 'Get database connection pool status' })
+  @ApiResponse({ status: 200, description: 'Current database pool configuration and usage' })
+  getDatabasePoolStatus() {
+    return this.databasePool?.getStatus() ?? { status: 'unavailable' };
   }
 
   private async checkRedis(): Promise<HealthIndicatorResult> {

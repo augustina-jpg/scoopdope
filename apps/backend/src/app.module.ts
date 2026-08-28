@@ -51,6 +51,10 @@ import { BundlesModule } from './bundles/bundles.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { LiveSessionsModule } from './live-sessions/live-sessions.module';
 import { PaymentsModule } from './payments/payments.module';
+import { DistributedLockModule } from './common/distributed-lock.module';
+import { DownloadsModule } from './downloads/downloads.module';
+import { QaModule } from './qa/qa.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 import * as redisStore from 'cache-manager-redis-store';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import configuration from './config/configuration';
@@ -73,7 +77,7 @@ import { validationSchema } from './config/validation.schema';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const nodeEnv = config.get<string>('nodeEnv');
+        const nodeEnv = config.get<string>('nodeEnv') ?? 'development';
         const synchronize = nodeEnv !== 'production' && nodeEnv !== 'staging';
 
         // Validate that synchronize is not enabled in production/staging
@@ -89,8 +93,9 @@ import { validationSchema } from './config/validation.schema';
           autoLoadEntities: true,
           synchronize,
           extra: {
-            max: config.get<number>('database.poolSize') || 50,
-            idleTimeoutMillis: 30_000,
+            min: config.get<number>('database.poolMin') || 5,
+            max: config.get<number>('database.poolMax') || 20,
+            idleTimeoutMillis: config.get<number>('database.idleTimeoutMs') || 30_000,
             connectionTimeoutMillis: 5_000,
           },
         };
