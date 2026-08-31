@@ -6,6 +6,12 @@ export enum SubscriptionTier {
   ENTERPRISE = 'enterprise',
 }
 
+export enum Role {
+  ADMIN = 'admin',
+  INSTRUCTOR = 'instructor',
+  STUDENT = 'student',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -29,8 +35,12 @@ export class User {
   @Column({ nullable: true })
   stellarPublicKey: string;
 
-  @Column({ default: 'student' })
-  role: string;
+  @Column({
+    type: 'enum',
+    enum: Role,
+    default: Role.STUDENT,
+  })
+  role: Role;
 
   @Column({ default: false })
   isBanned: boolean;
