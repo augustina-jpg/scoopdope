@@ -79,8 +79,8 @@ export class NotificationsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Results per page, max 100 (default: 20)' })
   @ApiResponse({ status: 200, description: 'Returns paginated user notifications with unread count' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  findAll(@Request() req, @Query() query: NotificationQueryDto) {
-    return this.notificationsService.findByUser(req.user.id, query.page, query.limit);
+  findAll(@Request() req: { user: { id: string } }) {
+    return this.notificationsService.findByUser(req.user.id);
   }
 
   /**
@@ -129,7 +129,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Mark all notifications as read' })
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  markAllAsRead(@Request() req) {
+  markAllAsRead(@Request() req: { user: { id: string } }) {
     return this.notificationsService.markAllAsRead(req.user.id);
   }
 
@@ -139,8 +139,7 @@ export class NotificationsController {
     schema: { example: { endpoint: 'https://...', keys: { p256dh: '...', auth: '...' } } },
   })
   @ApiResponse({ status: 201, description: 'Subscribed successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  subscribe(@Request() req, @Body() subscription: any) {
+  subscribe(@Request() req: { user: { id: string } }, @Body() subscription: any) {
     return this.pushNotificationsService.subscribe(req.user.id, subscription);
   }
 
@@ -148,8 +147,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Unsubscribe from push notifications' })
   @ApiBody({ schema: { example: { endpoint: 'https://...' } } })
   @ApiResponse({ status: 200, description: 'Unsubscribed successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  unsubscribe(@Request() req, @Body('endpoint') endpoint: string) {
+  unsubscribe(@Request() req: { user: { id: string } }, @Body('endpoint') endpoint: string) {
     return this.pushNotificationsService.unsubscribe(req.user.id, endpoint);
   }
 
@@ -161,8 +159,7 @@ export class NotificationsController {
     },
   })
   @ApiResponse({ status: 200, description: 'Preferences updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  updatePreferences(@Request() req, @Body() preferences: any) {
+  updatePreferences(@Request() req: { user: { id: string } }, @Body() preferences: any) {
     return this.notificationsService.updatePreferences(req.user.id, preferences);
   }
 }
