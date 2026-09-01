@@ -25,7 +25,9 @@ export default () => ({
     username: process.env.DATABASE_USER!,
     password: process.env.DATABASE_PASSWORD!,
     name: process.env.DATABASE_NAME!,
-    poolSize: parseInt(process.env.DATABASE_POOL_SIZE || '50', 10),
+    poolMin: parseInt(process.env.DATABASE_POOL_MIN || '5', 10),
+    poolMax: parseInt(process.env.DATABASE_POOL_MAX || '20', 10),
+    idleTimeoutMs: parseInt(process.env.DATABASE_IDLE_TIMEOUT_MS || '30000', 10),
   },
 
   jwt: {
@@ -115,9 +117,8 @@ export default () => ({
     batchSize: parseInt(process.env.PAYOUT_BATCH_SIZE ?? '500', 10),
   },
 
-  monitoring: {
-    slowQueryThreshold: parseInt(process.env.MONITORING_SLOW_QUERY_THRESHOLD || '1000', 10),
-    criticalQueryThreshold: parseInt(process.env.MONITORING_CRITICAL_QUERY_THRESHOLD || '5000', 10),
-    slowQueryLogPath: process.env.MONITORING_SLOW_QUERY_LOG_PATH || 'logs/slow-queries.log',
+  rewards: {
+    moduleCompletion: parseInt(process.env.REWARD_MODULE_COMPLETION ?? '25', 10),
+    courseCompletion: parseInt(process.env.REWARD_COURSE_COMPLETION ?? '100', 10),
   },
 });
