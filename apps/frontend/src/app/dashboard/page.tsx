@@ -23,14 +23,8 @@ import { CircularProgress } from '@/components/ui/CircularProgress';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StreakWidget } from '@/components/ui/StreakWidget';
 import { TokenBalanceWidget } from '@/components/dashboard/TokenBalanceWidget';
-import {
-  Award,
-  BookOpen,
-  CheckCircle2,
-  Download,
-  PlayCircle,
-  TrendingUp,
-} from 'lucide-react';
+import { BalanceWidget } from '@/components/dashboard/BalanceWidget';
+import { CheckCircle2 } from 'lucide-react';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { useOnboardingStore } from '@/store/onboarding.store';
 
@@ -277,10 +271,10 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
-              BST Token Balance
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Stellar Balances
             </h2>
-            <TokenBalanceWidget stellarPublicKey={state.user?.stellarPublicKey} />
+            <BalanceWidget stellarPublicKey={state.user?.stellarPublicKey} />
           </div>
 
           {/* Certificate count card */}
