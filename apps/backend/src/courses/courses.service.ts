@@ -29,6 +29,24 @@ export class CoursesService {
     private readonly metricsService: MetricsService = {} as MetricsService
   ) {}
 
+  /**
+   * Get average rating for a course from reviews
+   */
+  async getAverageRating(courseId: string): Promise<number | null> {
+    const course = await this.repo
+      .createQueryBuilder('course')
+      .leftJoinAndSelect('course.reviews', 'review')
+      .where('course.id = :courseId', { courseId })
+      .getOne();
+
+    if (!course || !course.reviews || course.reviews.length === 0) {
+      return null;
+    }
+
+    const sum = course.reviews.reduce((acc, review) => acc + (review.rating || 0), 0);
+    return parseFloat((sum / course.reviews.length).toFixed(2));
+  }
+
   async findAll(query: CourseQueryDto = {}) {
     const { search, level, category, language, page = 1, limit = 20 } = query;
 
@@ -71,25 +89,38 @@ export class CoursesService {
       qb.andWhere('course.language = :language', { language });
     }
 
+    if (categoryId) {
+      qb.andWhere('course.categoryId = :categoryId', { categoryId });
+    } else if (category) {
+      // Filter by slug when a full UUID is not provided
+      qb.andWhere('category.slug = :categorySlug', { categorySlug: category });
+    }
+
     const total = await qb.clone().getCount();
     const offset = (page - 1) * limit;
 
-    const { raw, entities } = await qb
-      .leftJoin('course.reviews', 'review')
+    // Always select the enrollment count subquery so we can sort by it when needed
+    qb.leftJoin('course.reviews', 'review')
       .addSelect('COALESCE(AVG(review.rating), 0)', 'course_averageRating')
+      .addSelect(
+        '(SELECT COUNT(e.id) FROM enrollments e WHERE e."courseId" = course.id)',
+        'enrollment_count',
+      )
       .skip(offset)
       .take(limit)
       .orderBy('course.createdAt', 'DESC')
       .groupBy('course.id')
+      .addGroupBy('category.id')
       .getRawAndEntities();
 
-    const averageRatings = new Map(
-      raw.map((item, index) => [entities[index].id, Number(item.course_averageRating) || 0])
+    const enrollmentCountMap = new Map(
+      raw.map((item, index) => [entities[index].id, Number(item.enrollment_count) || 0]),
     );
 
     const data = entities.map((course) => ({
       ...course,
-      averageRating: averageRatings.get(course.id) ?? 0,
+      averageRating: ratingMap.get(course.id) ?? 0,
+      enrollmentCount: enrollmentCountMap.get(course.id) ?? 0,
     }));
 
     const result = { data, total, page, limit };

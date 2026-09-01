@@ -15,7 +15,7 @@ export class LessonsService {
     @InjectRepository(Lesson) private repo: Repository<Lesson>,
     @InjectRepository(Course) private courseRepo: Repository<Course>,
     private readonly searchService: SearchService,
-    private readonly transcribeService: TranscribeService,
+    private readonly transcribeService: TranscribeService
   ) {}
 
   findByModule(moduleId: string) {
@@ -29,26 +29,26 @@ export class LessonsService {
   async create(moduleId: string, data: Partial<Lesson>) {
     const lesson = await this.repo.save(this.repo.create({ ...data, moduleId }));
     await this.searchService.indexLesson(lesson).catch(() => {});
-    
+
     if (lesson.videoUrl) {
       this.triggerTranscription(lesson);
     }
-    
+
     return lesson;
   }
 
   async update(id: string, data: Partial<Lesson>) {
     const lesson = await this.findOne(id);
     if (!lesson) throw new NotFoundException('Lesson not found');
-    
+
     const oldVideoUrl = lesson.videoUrl;
     const updated = await this.repo.save({ ...lesson, ...data });
     await this.searchService.indexLesson(updated).catch(() => {});
-    
+
     if (updated.videoUrl && updated.videoUrl !== oldVideoUrl) {
       this.triggerTranscription(updated);
     }
-    
+
     return updated;
   }
 
@@ -73,7 +73,9 @@ export class LessonsService {
 
     for (const lesson of lessons) {
       try {
-        const result = await this.transcribeService.getTranscriptionResult(lesson.transcriptionJobName);
+        const result = await this.transcribeService.getTranscriptionResult(
+          lesson.transcriptionJobName
+        );
         if (result && typeof result !== 'string') {
           // COMPLETED
           const srt = this.transcribeService.convertToSrt(result);
@@ -98,53 +100,43 @@ export class LessonsService {
   }
 
   /**
-   * Validates that an instructor teaches the course containing a lesson.
-   * @param lessonId - The ID of the lesson
-   * @param instructorId - The ID of the instructor
-   * @returns The lesson if validation passes
-   * @throws NotFoundException if lesson doesn't exist
-   * @throws ForbiddenException if instructor doesn't teach the course
+   * Reorder lessons within a module.
+   * Accepts an array of lesson IDs in the desired order.
+   * The order values are reassigned sequentially starting from 0.
+   *
+   * Supports partial reordering - only specified lessons will have their order updated.
+   * Other lessons in the module will retain their existing order values.
+   *
+   * @param moduleId - The module ID
+   * @param lessonIds - Array of lesson IDs in desired order
+   * @returns Updated lessons in the new order
+   * @throws {NotFoundException} if any lesson ID is not found or does not belong to the module
    */
-  async validateInstructorOwnsLesson(lessonId: string, instructorId: string): Promise<Lesson> {
-    const lesson = await this.repo.findOne({
-      where: { id: lessonId },
-      relations: ['module', 'module.course', 'module.course.instructor'],
+  async reorder(moduleId: string, lessonIds: string[]): Promise<Lesson[]> {
+    // Fetch all lessons in the module
+    const allLessons = await this.repo.find({ where: { moduleId } });
+
+    // Create a map of lesson IDs to lesson objects
+    const lessonMap = new Map(allLessons.map((l) => [l.id, l]));
+
+    // Validate all requested lesson IDs exist and belong to this module
+    for (const lessonId of lessonIds) {
+      if (!lessonMap.has(lessonId)) {
+        throw new NotFoundException(`Lesson ${lessonId} not found in module ${moduleId}`);
+      }
+    }
+
+    // Update order for the specified lessons
+    for (let i = 0; i < lessonIds.length; i++) {
+      const lesson = lessonMap.get(lessonIds[i])!;
+      lesson.order = i;
+      await this.repo.save(lesson);
+    }
+
+    // Return all lessons in order
+    return this.repo.find({
+      where: { moduleId },
+      order: { order: 'ASC' },
     });
-
-    if (!lesson) {
-      throw new NotFoundException('Lesson not found');
-    }
-
-    // Check if instructor teaches the course
-    if (lesson.module?.course?.instructorId !== instructorId) {
-      throw new ForbiddenException('You do not teach the course containing this lesson');
-    }
-
-    return lesson;
-  }
-
-  /**
-   * Updates lesson content with validation.
-   * @param id - The ID of the lesson
-   * @param instructorId - The ID of the instructor performing the update
-   * @param data - Partial lesson data to update
-   * @returns The updated lesson
-   * @throws NotFoundException if lesson doesn't exist
-   * @throws ForbiddenException if instructor doesn't teach the course
-   */
-  async updateContent(id: string, instructorId: string, data: Partial<Lesson>) {
-    // Validate instructor ownership
-    const lesson = await this.validateInstructorOwnsLesson(id, instructorId);
-
-    // Update allowed fields only
-    const updateData: Partial<Lesson> = {};
-    if (data.content !== undefined) updateData.content = data.content;
-    if (data.learningObjectives !== undefined) updateData.learningObjectives = data.learningObjectives;
-    if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes;
-
-    const updated = await this.repo.save({ ...lesson, ...updateData });
-    await this.searchService.indexLesson(updated).catch(() => {});
-
-    return updated;
   }
 }
