@@ -4,7 +4,22 @@ import { useEffect, useState } from 'react';
 import { LEVELS, LANGUAGES, DURATIONS, PRICE_RANGES, SORT_OPTIONS, type SortOption } from '@/app/courses/courses.config';
 import api from '@/lib/api';
 
-const cls = 'rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100';
+import { useState } from 'react';
+import {
+  LEVELS,
+  CATEGORIES,
+  LANGUAGES,
+  DURATIONS,
+  PRICE_RANGES,
+  SORT_OPTIONS,
+  RATING_FILTERS,
+  ENROLLMENT_RANGES,
+  DATE_RANGES,
+  type SortOption,
+} from '@/app/courses/courses.config';
+
+const cls =
+  'rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 type ApiCategory = {
   id: string;
@@ -14,8 +29,16 @@ type ApiCategory = {
 };
 
 type Props = {
-  level: string; language: string; category: string;
-  duration: string; price: string; sort: SortOption;
+  level: string;
+  language: string;
+  category: string;
+  duration: string;
+  price: string;
+  sort: SortOption;
+  instructor: string;
+  minRating: string;
+  enrollmentRange: string;
+  dateRange: string;
   onChange: (key: string, value: string) => void;
 };
 

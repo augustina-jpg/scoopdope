@@ -30,6 +30,26 @@ export class ForumsService {
     @Optional() private readonly eventEmitter?: EventEmitter2
   ) {}
 
+  async findThreads(page = 1, limit = 20, courseId?: string) {
+    const safePage = Math.max(1, isNaN(page) ? 1 : page);
+    const safeLimit = Math.min(Math.max(1, isNaN(limit) ? 20 : limit), 100);
+
+    const where: Record<string, unknown> = {};
+    if (courseId) {
+      where.courseId = courseId;
+    }
+
+    const [data, total] = await this.postRepo.findAndCount({
+      where,
+      relations: ['user'],
+      order: { isPinned: 'DESC', createdAt: 'DESC' },
+      take: safeLimit,
+      skip: (safePage - 1) * safeLimit,
+    });
+
+    return { data, total, page: safePage, limit: safeLimit };
+  }
+
   async findPostsByCourse(courseId: string) {
     await this.ensureCourseExists(courseId);
 
@@ -38,6 +58,47 @@ export class ForumsService {
       relations: ['user', 'replies', 'replies.user'],
       order: { isPinned: 'DESC', createdAt: 'DESC' },
     });
+  }
+
+  async findThreads(page = 1, limit = 20, courseId?: string) {
+    const safePage = Math.max(1, isNaN(page) ? 1 : page);
+    const safeLimit = Math.min(Math.max(1, isNaN(limit) ? 20 : limit), 100);
+
+    const where: Record<string, unknown> = {};
+    if (courseId) {
+      where.courseId = courseId;
+    }
+
+    const [posts, total] = await this.postRepo.findAndCount({
+      where,
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      take: safeLimit,
+      skip: (safePage - 1) * safeLimit,
+    });
+
+    // Attach reply counts without loading all reply data
+    const postIds = posts.map((p) => p.id);
+    let replyCounts: Map<string, number> = new Map();
+
+    if (postIds.length > 0) {
+      const counts = await this.replyRepo
+        .createQueryBuilder('reply')
+        .select('reply.postId', 'postId')
+        .addSelect('COUNT(reply.id)', 'count')
+        .where('reply.postId IN (:...postIds)', { postIds })
+        .groupBy('reply.postId')
+        .getRawMany<{ postId: string; count: string }>();
+
+      replyCounts = new Map(counts.map((r) => [r.postId, parseInt(r.count, 10)]));
+    }
+
+    const data = posts.map((p) => ({
+      ...p,
+      replyCount: replyCounts.get(p.id) ?? 0,
+    }));
+
+    return { data, total, page: safePage, limit: safeLimit };
   }
 
   async getThread(threadId: string, page = 1, limit = 20) {

@@ -99,9 +99,13 @@ export class CoursesService {
     const total = await qb.clone().getCount();
     const offset = (page - 1) * limit;
 
-    const { raw, entities } = await qb
-      .leftJoin('course.reviews', 'review')
+    // Always select the enrollment count subquery so we can sort by it when needed
+    qb.leftJoin('course.reviews', 'review')
       .addSelect('COALESCE(AVG(review.rating), 0)', 'course_averageRating')
+      .addSelect(
+        '(SELECT COUNT(e.id) FROM enrollments e WHERE e."courseId" = course.id)',
+        'enrollment_count',
+      )
       .skip(offset)
       .take(limit)
       .orderBy('course.createdAt', 'DESC')
@@ -109,13 +113,14 @@ export class CoursesService {
       .addGroupBy('category.id')
       .getRawAndEntities();
 
-    const averageRatings = new Map(
-      raw.map((item, index) => [entities[index].id, Number(item.course_averageRating) || 0])
+    const enrollmentCountMap = new Map(
+      raw.map((item, index) => [entities[index].id, Number(item.enrollment_count) || 0]),
     );
 
     const data = entities.map((course) => ({
       ...course,
-      averageRating: averageRatings.get(course.id) ?? 0,
+      averageRating: ratingMap.get(course.id) ?? 0,
+      enrollmentCount: enrollmentCountMap.get(course.id) ?? 0,
     }));
 
     const result = { data, total, page, limit };
