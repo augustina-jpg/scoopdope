@@ -204,6 +204,84 @@ export class ModulesController {
     return this.lessonsService.update(id, dto);
   }
 
+  /**
+   * PATCH /v1/lessons/:lessonId
+   * Update lesson content with HTML sanitization and learning objectives.
+   * Requires instructor role and course ownership validation.
+   * 
+   * Acceptance Criteria:
+   * - Endpoint requires INSTRUCTOR role
+   * - Nonexistent lesson returns 404
+   * - Non-course instructor receives 403 Forbidden
+   * - Content required and validated (min 10 chars)
+   * - HTML is sanitized (no script tags)
+   * - Learning objectives array stored
+   * - Duration is numeric and positive
+   * - Response includes updated_at timestamp
+   */
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('instructor', 'admin')
+  @Patch('v1/lessons/:lessonId')
+  @ApiOperation({
+    summary: 'Update lesson content with sanitization',
+    description: 'Add or update lesson content, learning objectives, and duration. Instructor must teach the course containing the lesson.',
+  })
+  @ApiBody({
+    type: UpdateLessonContentDto,
+    description: 'Lesson content update payload',
+    examples: {
+      example1: {
+        summary: 'Update content with learning objectives',
+        value: {
+          content: '<p>This is the lesson <strong>content</strong> with some HTML formatting.</p>',
+          learningObjectives: [
+            'Understand the basics of blockchain',
+            'Implement a simple smart contract',
+          ],
+          estimatedDurationMinutes: 45,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lesson content updated successfully',
+    schema: {
+      example: {
+        id: 'uuid',
+        moduleId: 'uuid',
+        title: 'Lesson Title',
+        content: '<p>Updated content</p>',
+        learningObjectives: ['Objective 1', 'Objective 2'],
+        durationMinutes: 45,
+        videoUrl: null,
+        order: 0,
+        createdAt: '2025-01-15T10:30:00Z',
+        updatedAt: '2025-01-15T11:45:00Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Validation failed - content must be at least 10 characters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - JWT token required' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Instructor does not teach this course' })
+  @ApiResponse({ status: 404, description: 'Lesson not found' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async updateLessonContent(
+    @Param('lessonId') lessonId: string,
+    @Body() dto: UpdateLessonContentDto,
+    @Request() req: any,
+  ) {
+    const instructorId = req.user.id;
+    
+    return this.lessonsService.updateContent(lessonId, instructorId, {
+      content: dto.content,
+      learningObjectives: dto.learningObjectives,
+      durationMinutes: dto.estimatedDurationMinutes,
+    });
+  }
+
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('instructor', 'admin')

@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not } from 'typeorm';
 import { Lesson } from './lesson.entity';
 import { SearchService } from '../search/search.service';
 import { TranscribeService } from './transcribe.service';
 import { Interval } from '@nestjs/schedule';
+import { Course } from './course.entity';
 
 @Injectable()
 export class LessonsService {
@@ -12,6 +13,7 @@ export class LessonsService {
 
   constructor(
     @InjectRepository(Lesson) private repo: Repository<Lesson>,
+    @InjectRepository(Course) private courseRepo: Repository<Course>,
     private readonly searchService: SearchService,
     private readonly transcribeService: TranscribeService
   ) {}
