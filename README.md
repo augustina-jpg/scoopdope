@@ -1,4 +1,5 @@
-# scoopdope .......
+# scoopdope ....... good luck
+
 
 > A blockchain education platform built on the **Stellar network**, delivering verifiable on-chain credentials and token-based learning incentives.
 
