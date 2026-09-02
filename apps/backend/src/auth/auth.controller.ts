@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query, Redirect, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiProperty } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiProperty } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { RateLimit } from '../rate-limit/rate-limit.decorator';
@@ -312,6 +312,7 @@ export class AuthController {
 
   @Post('mfa/enable')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Enable MFA - generate TOTP secret' })
   @ApiResponse({ status: 200, description: 'Returns TOTP secret and QR code URL' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -326,6 +327,7 @@ export class AuthController {
 
   @Post('mfa/verify')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify MFA code and enable TOTP' })
   @ApiResponse({ status: 200, description: 'MFA enabled successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -340,6 +342,7 @@ export class AuthController {
 
   @Post('mfa/disable')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Disable MFA' })
   @ApiResponse({ status: 200, description: 'MFA disabled successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -354,6 +357,7 @@ export class AuthController {
 
   @Post('mfa/backup-codes/regenerate')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Regenerate backup codes (requires valid TOTP)' })
   @ApiResponse({ status: 200, description: 'Backup codes regenerated' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -369,6 +373,7 @@ export class AuthController {
   @Post('admin/api-keys')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Generate an API key for a user (admin)' })
   @ApiResponse({ status: 201, description: 'API key generated' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -384,6 +389,7 @@ export class AuthController {
   @Post('admin/api-keys/revoke')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke an API key (admin)' })
   @ApiResponse({ status: 200, description: 'API key revoked' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -398,6 +404,7 @@ export class AuthController {
 
   @Post('stellar-challenge')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Generate a challenge for Stellar wallet signing' })
   @ApiResponse({ status: 200, description: 'Challenge generated successfully' })
@@ -413,6 +420,7 @@ export class AuthController {
 
   @Post('stellar-verify')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Verify Stellar wallet signature and link to account' })
   @ApiResponse({ status: 200, description: 'Wallet linked successfully' })
