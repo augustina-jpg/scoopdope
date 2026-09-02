@@ -88,6 +88,7 @@ class RefreshDto {
 }
 
 @ApiTags('auth')
+@RateLimit(AUTH_RATE_LIMIT)
 @Controller('auth')
 export class AuthController {
   constructor(
