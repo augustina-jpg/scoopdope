@@ -105,6 +105,8 @@ export function ProfilePage() {
     api.get('/v1/badges/me')
       .then((response) => setBadges(response.data ?? []))
       .catch(() => setBadges([]));
+
+    api.get('/v1/badges/me').then((response) => setBadges(response.data ?? [])).catch(() => setBadges([]));
   }, [user]);
 
   // Cleanup timeout and object URL on unmount
@@ -556,3 +558,6 @@ export function ProfilePage() {
     </ProtectedRoute>
   );
 }
+
+
+
