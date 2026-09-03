@@ -20,6 +20,12 @@ import { AuthModule } from './auth/auth.module';
 import { CoursesModule } from './courses/courses.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { CertificatesModule } from './certificates/certificates.module';
+import { ApiVersionModule } from './common/versioning';
+import { PayoutsModule } from './payouts/payouts.module';
+import { InstructorApplicationsModule } from './instructor-applications/instructor-applications.module';
+import { AssignmentsModule } from './assignments/assignments.module';
+import { StreaksModule } from './streaks/streaks.module';
+import { StudySessionsModule } from './study-sessions/study-sessions.module';
 import { BundlesModule } from './bundles/bundles.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { LiveSessionsModule } from './live-sessions/live-sessions.module';
@@ -67,6 +73,32 @@ import { UserRateLimitGuard } from './rate-limit/user-rate-limit.guard';
     CoursesModule,
     EnrollmentsModule,
     CertificatesModule,
+    PayoutsModule,
+    InstructorApplicationsModule,
+    HealthModule,
+    MetricsModule,
+    KycModule,
+    RecommendationsModule,
+    EmailModule,
+    AnalyticsModule,
+    WebhooksModule,
+    ModerationModule,
+    ImportExportModule,
+    SearchModule,
+    BatchModule,
+    ApiUsageModule,
+    QuizzesModule,
+    CohortsModule,
+    CdnModule,
+    AccessControlModule,
+    RateLimitModule,
+    AuditModule,
+    DownloadsModule,
+    QaModule,
+    AnnouncementsModule,
+    AssignmentsModule,
+    StreaksModule,
+    StudySessionsModule,
     BundlesModule,
     SubscriptionsModule,
     LiveSessionsModule,

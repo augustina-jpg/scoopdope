@@ -1,5 +1,6 @@
 import './tracing';
 import './instrument';
+import * as compression from 'compression';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -74,6 +75,21 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableShutdownHooks();
+
+  // #882: Enable gzip compression for responses >1KB
+  app.use(
+    compression({
+      threshold: 1024, // Only compress responses larger than 1KB
+      level: 6,        // Balanced compression level (0-9)
+      filter: (req, res) => {
+        // Respect Cache-Control: no-transform
+        if (res.getHeader('Cache-Control')?.toString().includes('no-transform')) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+    }),
+  );
   const configService = app.get(ConfigService);
 
   const port = configService.get<number>('port');
