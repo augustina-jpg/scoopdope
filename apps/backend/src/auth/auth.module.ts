@@ -56,6 +56,6 @@ import { UserDeactivationModule } from '../user-deactivation/user-deactivation.m
     GoogleStrategy,
   ],
   controllers: [AuthController],
-  exports: [JwtAuthGuard, RolesGuard, ApiKeyAuthGuard, EncryptionService],
+  exports: [JwtModule, JwtAuthGuard, RolesGuard, ApiKeyAuthGuard, EncryptionService],
 })
 export class AuthModule {}

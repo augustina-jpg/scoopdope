@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 
@@ -27,10 +26,11 @@ import { LiveSessionsModule } from './live-sessions/live-sessions.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RewardsModule } from './rewards/rewards.module';
 import * as redisStore from 'cache-manager-redis-store';
-import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
 
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { UserRateLimitGuard } from './rate-limit/user-rate-limit.guard';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -48,12 +48,6 @@ import { validationSchema } from './config/validation.schema';
       host: process.env.REDIS_HOST || 'localhost',
       port: process.env.REDIS_PORT || 6379,
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60 * 1000,
-        limit: 100,
-      },
-    ]),
     TypeOrmModule.forRootAsync({
       useFactory: async (configService: ConfigService) => ({
         type: 'postgres',
@@ -78,6 +72,7 @@ import { validationSchema } from './config/validation.schema';
     LiveSessionsModule,
     PaymentsModule,
     RewardsModule,
+    RateLimitModule,
     ApiVersionModule,
     MonitoringModule,
   ],
@@ -92,7 +87,7 @@ import { validationSchema } from './config/validation.schema';
     },
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: UserRateLimitGuard,
     },
   ],
 })
