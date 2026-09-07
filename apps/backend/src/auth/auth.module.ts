@@ -22,6 +22,7 @@ import { ApiKeyStrategy } from './api-key.strategy';
 import { ApiKeyAuthGuard } from './api-key-auth.guard';
 import { AuditModule } from '../audit/audit.module';
 import { GoogleStrategy } from './google.strategy';
+import { MicrosoftStrategy } from './microsoft.strategy';
 import { UserDeactivationModule } from '../user-deactivation/user-deactivation.module';
 
 @Module({
@@ -54,6 +55,7 @@ import { UserDeactivationModule } from '../user-deactivation/user-deactivation.m
     ApiKeyStrategy,
     ApiKeyAuthGuard,
     GoogleStrategy,
+    MicrosoftStrategy,
   ],
   controllers: [AuthController],
   exports: [JwtModule, JwtAuthGuard, RolesGuard, ApiKeyAuthGuard, EncryptionService],

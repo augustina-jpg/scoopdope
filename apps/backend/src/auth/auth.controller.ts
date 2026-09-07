@@ -8,6 +8,8 @@ import { AuthService } from './auth.service';
 import { StellarAuthService } from './stellar-auth.service';
 import { GoogleAuthGuard } from './google-auth.guard';
 import { GoogleProfile } from './google.strategy';
+import { MicrosoftAuthGuard } from './microsoft-auth.guard';
+import { MicrosoftProfile } from './microsoft.strategy';
 import { IsEmail, IsString, MinLength, IsOptional, Matches } from 'class-validator';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
@@ -113,6 +115,27 @@ export class AuthController {
   @ApiResponse({ status: 302, description: 'Redirects to frontend with tokens' })
   async googleCallback(@Req() req: { user: GoogleProfile }) {
     const tokens = await this.authService.googleOAuthLogin(req.user);
+    const frontendUrl = this.configService.get<string>('frontend.url');
+    return {
+      url: `${frontendUrl}/auth/callback?access_token=${tokens.access_token}&refresh_token=${tokens.refresh_token}`,
+    };
+  }
+
+  @Get('microsoft')
+  @UseGuards(MicrosoftAuthGuard)
+  @ApiOperation({ summary: 'Initiate Microsoft OAuth login' })
+  @ApiResponse({ status: 302, description: 'Redirects to Microsoft OAuth consent screen' })
+  microsoftLogin() {
+    // Guard redirects to Microsoft
+  }
+
+  @Get('microsoft/callback')
+  @UseGuards(MicrosoftAuthGuard)
+  @Redirect()
+  @ApiOperation({ summary: 'Microsoft OAuth callback — issues JWT and redirects to frontend' })
+  @ApiResponse({ status: 302, description: 'Redirects to frontend with tokens' })
+  async microsoftCallback(@Req() req: { user: MicrosoftProfile }) {
+    const tokens = await this.authService.microsoftOAuthLogin(req.user);
     const frontendUrl = this.configService.get<string>('frontend.url');
     return {
       url: `${frontendUrl}/auth/callback?access_token=${tokens.access_token}&refresh_token=${tokens.refresh_token}`,
