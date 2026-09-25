@@ -1,45 +1,35 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Load testing script for scoopdope API
-# Requires k6 to be installed: https://k6.io/docs/getting-started/installation/
-
-set -e
-
+PROFILE="${LOAD_PROFILE:-smoke}"
 API_URL="${API_URL:-http://localhost:3000}"
-RESULTS_DIR="./load-test-results"
+RESULTS_DIR="${RESULTS_DIR:-load-test-results}"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+JSON_PATH="$RESULTS_DIR/api-read-only-$PROFILE-$TIMESTAMP.json"
+SUMMARY_PATH="$RESULTS_DIR/api-read-only-$PROFILE-$TIMESTAMP.txt"
+
+if ! command -v k6 >/dev/null 2>&1; then
+  echo "k6 is not installed or not available on PATH. See docs/load-testing.md." >&2
+  exit 1
+fi
 
 mkdir -p "$RESULTS_DIR"
+curl --fail --silent --show-error --max-time 10 "$API_URL/health/live" >/dev/null
 
-echo "🚀 Starting load tests for scoopdope API"
-echo "API URL: $API_URL"
-echo ""
+K6_ARGS=(
+  run
+  --out "json=$JSON_PATH"
+  --summary-export "$SUMMARY_PATH"
+  --env "API_URL=$API_URL"
+  --env "LOAD_PROFILE=$PROFILE"
+  scripts/load-tests/api-read-only.js
+)
 
-# Test 1: GET /courses (500 VUs)
-echo "📊 Test 1: GET /courses (500 VUs, 30s duration)"
-k6 run \
-  --vus 500 \
-  --duration 30s \
-  --out json="$RESULTS_DIR/courses-load-test.json" \
-  scripts/load-tests/courses.js
+if [[ "${INCLUDE_LEADERBOARD:-false}" == "true" ]]; then
+  K6_ARGS+=(--env INCLUDE_LEADERBOARD=true)
+fi
 
-# Test 2: POST /auth/login (100 VUs)
-echo ""
-echo "📊 Test 2: POST /auth/login (100 VUs, 30s duration)"
-k6 run \
-  --vus 100 \
-  --duration 30s \
-  --out json="$RESULTS_DIR/login-load-test.json" \
-  scripts/load-tests/auth-login.js
-
-# Test 3: GET /stellar/balance/:key (50 VUs)
-echo ""
-echo "📊 Test 3: GET /stellar/balance/:key (50 VUs, 30s duration)"
-k6 run \
-  --vus 50 \
-  --duration 30s \
-  --out json="$RESULTS_DIR/stellar-balance-load-test.json" \
-  scripts/load-tests/stellar-balance.js
-
-echo ""
-echo "✅ Load tests completed!"
-echo "Results saved to: $RESULTS_DIR"
+echo "Running k6 $PROFILE profile against $API_URL"
+k6 "${K6_ARGS[@]}"
+echo "Results written to $JSON_PATH"
+echo "Summary written to $SUMMARY_PATH"

@@ -5,6 +5,21 @@ on:
     branches: ['**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Reachable staging API URL, for example https://staging-api.example.com'
+        required: true
+        type: string
+      profile:
+        description: 'k6 load profile'
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - baseline
+          - stress
 
 jobs:
   backend-test:
@@ -494,7 +509,7 @@ jobs:
   load-tests:
     name: Load Tests - k6
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -503,36 +518,30 @@ jobs:
       - name: Set up k6
         uses: grafana/setup-k6-action@v1
 
-      - name: Run auth load test
-        run: k6 run --out json=results-auth.json scripts/load-tests/auth-login.js
+      - name: Verify API is reachable
+        run: curl --fail --silent --show-error --max-time 10 "$API_URL/health/live"
         env:
-          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
-        continue-on-error: true
+          API_URL: ${{ inputs.api_url }}
 
-      - name: Run courses load test
-        run: k6 run --out json=results-courses.json scripts/load-tests/courses.js
+      - name: Run read-only load test
+        run: |
+          mkdir -p load-test-results
+          k6 run \
+            --out json="load-test-results/api-read-only-${PROFILE}.json" \
+            --summary-export "load-test-results/api-read-only-${PROFILE}.txt" \
+            --env API_URL="$API_URL" \
+            --env LOAD_PROFILE="$PROFILE" \
+            scripts/load-tests/api-read-only.js
         env:
-          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
-        continue-on-error: true
-
-      - name: Run enrollment load test
-        run: k6 run --out json=results-enrollment.json scripts/load-tests/enrollment.js
-        env:
-          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
-        continue-on-error: true
-
-      - name: Run video streaming load test
-        run: k6 run --out json=results-video.json scripts/load-tests/video-streaming.js
-        env:
-          API_URL: ${{ env.API_URL || 'http://localhost:3000' }}
-        continue-on-error: true
+          API_URL: ${{ inputs.api_url }}
+          PROFILE: ${{ inputs.profile }}
 
       - name: Upload k6 results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k6-load-test-results
-          path: results-*.json
+          path: load-test-results/*
           retention-days: 30
 
   sonarcloud:

@@ -319,32 +319,29 @@ Load tests validate that the API meets its SLOs under realistic concurrent traff
 
 ### Test Scripts
 
-Located in `scripts/load-tests/`:
-
-| Script | Endpoint | Virtual Users | Duration |
-|---|---|---|---|
-| `courses.js` | `GET /courses` | 500 | 30s |
-| `auth-login.js` | `POST /auth/login` | 100 | 30s |
-| `stellar-balance.js` | `GET /stellar/balance/:key` | 50 | 30s |
+The authoritative scenario is `scripts/load-tests/api-read-only.js`. It calls
+only `GET /health/live` and `GET /v1/courses` by default. The optional
+leaderboard request is enabled explicitly with `INCLUDE_LEADERBOARD=true`.
 
 ### Running Load Tests
 
-Run all scripts:
+Run the smoke profile:
 
 ```bash
-./scripts/load-test.sh
+bash scripts/load-test.sh
 ```
 
-Run a single script:
+Run a baseline or stress profile:
 
 ```bash
-k6 run --vus 500 --duration 30s scripts/load-tests/courses.js
+LOAD_PROFILE=baseline bash scripts/load-test.sh
+LOAD_PROFILE=stress bash scripts/load-test.sh
 ```
 
 Against a non-local environment:
 
 ```bash
-API_URL=https://staging.example.com ./scripts/load-test.sh
+API_URL=https://staging.example.com bash scripts/load-test.sh
 ```
 
 ### Interpreting Results
@@ -365,16 +362,19 @@ If k6 exits with a non-zero code, at least one threshold was breached. Check:
 
 ### CI Integration
 
-Load tests run against a staging environment on PRs targeting `main`:
+Load tests are manually dispatched against a supplied staging URL:
 
 ```yaml
 - name: Run load tests
-  run: ./scripts/load-test.sh
+  run: k6 run scripts/load-tests/api-read-only.js
   env:
-    API_URL: ${{ secrets.STAGING_API_URL }}
+    API_URL: ${{ inputs.api_url }}
+    LOAD_PROFILE: ${{ inputs.profile }}
 ```
 
-A threshold breach fails the CI job and blocks the merge.
+A threshold breach fails the manually dispatched CI job. No performance result
+is treated as a baseline until it has been captured with environment metadata;
+see [load-testing-results.md](./load-testing-results.md).
 
 For full k6 setup and troubleshooting, see [docs/load-testing.md](./load-testing.md).
 
