@@ -15,6 +15,14 @@ Create a branch off `main` using a short, descriptive name prefixed by the type 
 
 Use lowercase words separated by hyphens, and reference the issue number when one exists, e.g. `fix/1069-contributing-guide`.
 
+## Code style
+
+This repository enforces a consistent code style across all files using `.editorconfig` and Prettier:
+
+- `.editorconfig` configures editor indentation (2 spaces for JS/TS/JSON/YAML, 4 spaces for Rust, tabs for Makefile), UTF-8 charset, LF line endings, and trailing newline insertion.
+- Prettier is configured via `.prettierrc` (single quotes, 2 spaces indentation, 100 column print width, trailing commas).
+- Run formatting checks via `npm run format:check` and auto-format files using `npm run format`.
+
 ## Commit message conventions
 
 This repository follows [Conventional Commits](https://www.conventionalcommits.org/). Each commit message should have the form:
