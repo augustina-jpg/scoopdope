@@ -17,6 +17,7 @@ import { RequestValidationMiddleware } from './common/middleware/request-validat
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'crypto';
 import { MetricsInterceptor } from './metrics/metrics.interceptor';
 import { MetricsService } from './metrics/metrics.service';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
@@ -32,6 +33,41 @@ import {
 
 // #1008: Global request body size limit (1MB).
 const BODY_SIZE_LIMIT = '1mb';
+
+// #1010: ETag support for client-side caching of GET responses.
+function computeETag(body: Buffer | string): string {
+  const hash = createHash('sha1').update(body).digest('base64');
+  return `"${hash}"`;
+}
+
+// #1010: Attach an ETag to GET responses and honor conditional requests via
+// If-None-Match, returning 304 Not Modified when the ETag matches. Non-GET
+// requests are left untouched.
+function etagMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next();
+  }
+
+  const originalSend = res.send.bind(res);
+  res.send = (body?: any): express.Response => {
+    if (body !== undefined && body !== null && !res.getHeader('ETag')) {
+      const payload = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+      const etag = computeETag(payload);
+      res.setHeader('ETag', etag);
+
+      const ifNoneMatch = req.headers['if-none-match'];
+      if (ifNoneMatch && ifNoneMatch.split(',').map((t) => t.trim()).includes(etag)) {
+        res.status(304);
+        res.removeHeader('Content-Type');
+        res.removeHeader('Content-Length');
+        return originalSend();
+      }
+    }
+    return originalSend(body);
+  };
+
+  next();
+}
 
 async function runMigrationCommand(command: string) {
   const logger = new Logger('MigrationCommand');
@@ -85,6 +121,9 @@ async function bootstrap() {
   // #1008: Reject request bodies larger than the global limit with 413.
   app.use(express.json({ limit: BODY_SIZE_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
+
+  // #1010: ETag support for GET responses (conditional requests → 304).
+  app.use(etagMiddleware);
 
   // #882: Enable gzip compression for responses >1KB
   app.use(
@@ -150,7 +189,7 @@ async function bootstrap() {
     origin: corsOrigins,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-KEY', 'X-Webhook-Signature', 'Idempotency-Key'],
-    exposedHeaders: ['X-Request-ID'],
+    exposedHeaders: ['X-Request-ID', 'ETag'],
     credentials: corsCredentials,
     maxAge: corsPreflight,
   });
@@ -184,48 +223,6 @@ async function bootstrap() {
         '### Getting Started\n\n' +
         '1. **Register**: POST /api/v1/auth/register with email and password\n' +
         '2. **Login**: POST /api/v1/auth/login to receive access_token\n' +
-        '3. **Authorize**: Click "Authorize" button and enter: `Bearer <access_token>`\n' +
-        '4. **Use API**: All protected endpoints now accessible\n\n' +
-        '### Example Flow\n\n' +
-        '```bash\n' +
-        '# Register\n' +
-        'curl -X POST https://api.scoopdope.com/api/v1/auth/register \\\n' +
-        '  -H "Content-Type: application/json" \\\n' +
-        '  -d \'{"email":"user@example.com","password":"securepass123"}\'\n\n' +
-        '# Login\n' +
-        'curl -X POST https://api.scoopdope.com/api/v1/auth/login \\\n' +
-        '  -H "Content-Type: application/json" \\\n' +
-        '  -d \'{"email":"user@example.com","password":"securepass123"}\'\n\n' +
-        '# Use token in subsequent requests\n' +
-        'curl -X GET https://api.scoopdope.com/api/v1/courses \\\n' +
-        '  -H "Authorization: Bearer <your_access_token>"\n' +
-        '```'
-    )
-    .setVersion('1.0')
-    .addBearerAuth({
-      type: 'http',
-      scheme: 'bearer',
-      bearerFormat: 'JWT',
-      description: 'Enter JWT token obtained from /v1/auth/login',
-    })
-    .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-KEY' }, 'X-API-KEY')
-    .addServer(`/${LATEST_API_VERSION}`, `API ${LATEST_API_VERSION} (latest)`)
-    .addServer(`/${DEFAULT_API_VERSION}`, `API ${DEFAULT_API_VERSION}`)
-    .build();
+        '3. **Authorize**: Click "Authorize" button and enter: `Bearer <ac
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
-
-  writeFileSync(
-    join(process.cwd(), 'openapi.json'),
-    JSON.stringify(document, null, 2),
-  );
-
-  await app.listen(port);
-  logger.log(`Application is running on port ${port}`);
-  logger.log(`API version: ${v1Info.version} (${v1Info.status})`);
-}
-
-bootstrap();
+/* … truncated 1749 chars — edit only what you need near the top … */
