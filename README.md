@@ -352,3 +352,9 @@ Quick summary:
 
 <!-- handsoff-issue-977 -->
 - #977: Wallet creation does not store public key in DB
+
+<!-- handsoff-issue-1011 -->
+- #1011: DELETE endpoints return 200 instead of 204
+
+<!-- handsoff-issue-1012 -->
+- #1012: Query parameter injection not sanitized

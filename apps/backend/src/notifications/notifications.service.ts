@@ -9,6 +9,24 @@ import { PushNotificationsService } from './push-notifications.service';
 
 const NOTIFICATION_CENTER_LIMIT = 20;
 
+export interface NotificationPreferences {
+  pushEnabled: boolean;
+  emailEnabled: boolean;
+  courseUpdates: boolean;
+  tokenRewards: boolean;
+  qaActivity: boolean;
+  announcements: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  pushEnabled: true,
+  emailEnabled: true,
+  courseUpdates: true,
+  tokenRewards: true,
+  qaActivity: true,
+  announcements: true,
+};
+
 export interface PaginatedNotifications {
   data: Notification[];
   total: number;
@@ -27,17 +45,39 @@ export class NotificationsService {
     private pushNotificationsService: PushNotificationsService,
   ) {}
 
-  async updatePreferences(userId: string, preferences: any) {
+  /**
+   * Returns the user's notification preferences, falling back to defaults
+   * for any channel/type the user has not explicitly configured.
+   */
+  async getPreferences(userId: string): Promise<NotificationPreferences> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const stored = (user as any).notificationPreferences ?? {};
+    return { ...DEFAULT_NOTIFICATION_PREFERENCES, ...stored };
+  }
+
+  /**
+   * Merges the provided preference toggles into the user's stored
+   * notification preferences and persists them.
+   */
+  async updatePreferences(
+    userId: string,
+    preferences: Partial<NotificationPreferences>,
+  ): Promise<NotificationPreferences> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
     const current = (user as any).notificationPreferences ?? {};
-    (user as any).notificationPreferences = {
+    const merged: NotificationPreferences = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
       ...current,
       ...preferences,
     };
+    (user as any).notificationPreferences = merged;
 
-    return this.userRepo.save(user);
+    await this.userRepo.save(user);
+    return merged;
   }
 
   async create(
@@ -66,7 +106,6 @@ export class NotificationsService {
         case NotificationType.ENROLLMENT:
         case NotificationType.COMPLETION:
         case NotificationType.COURSE_PUBLISHED:
-        case NotificationType.ANNOUNCEMENT:
         case NotificationType.UPDATE:
           shouldSendPush = prefs.courseUpdates;
           break;
@@ -76,7 +115,10 @@ export class NotificationsService {
           break;
         case NotificationType.QA_QUESTION:
         case NotificationType.QA_ANSWER:
-          shouldSendPush = true;
+          shouldSendPush = prefs.qaActivity;
+          break;
+        case NotificationType.ANNOUNCEMENT:
+          shouldSendPush = prefs.announcements;
           break;
       }
 
