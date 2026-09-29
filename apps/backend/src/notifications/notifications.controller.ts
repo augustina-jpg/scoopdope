@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { NotificationsService } from './notifications.service';
@@ -59,6 +59,38 @@ class CreateSystemNotificationDto {
   message: string;
 }
 
+class UpdateNotificationPreferencesDto {
+  @ApiPropertyOptional({ description: 'Receive course update notifications' })
+  @IsOptional()
+  @IsBoolean()
+  courseUpdates?: boolean;
+
+  @ApiPropertyOptional({ description: 'Receive live session notifications' })
+  @IsOptional()
+  @IsBoolean()
+  liveSessions?: boolean;
+
+  @ApiPropertyOptional({ description: 'Receive token reward notifications' })
+  @IsOptional()
+  @IsBoolean()
+  tokenRewards?: boolean;
+
+  @ApiPropertyOptional({ description: 'Receive system/announcement notifications' })
+  @IsOptional()
+  @IsBoolean()
+  systemAnnouncements?: boolean;
+
+  @ApiPropertyOptional({ description: 'Enable push notifications' })
+  @IsOptional()
+  @IsBoolean()
+  pushEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Enable email notifications' })
+  @IsOptional()
+  @IsBoolean()
+  emailEnabled?: boolean;
+}
+
 @ApiTags('notifications')
 @ApiBearerAuth()
 @Controller('notifications')
@@ -96,6 +128,18 @@ export class NotificationsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getUnreadCount(@Request() req: { user: { id: string } }) {
     return this.notificationsService.getUnreadCount(req.user.id);
+  }
+
+  /**
+   * GET /v1/notifications/preferences
+   * Returns the current user's notification preferences.
+   */
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get notification preferences for the current user' })
+  @ApiResponse({ status: 200, description: 'Returns the user notification preferences' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  getPreferences(@Request() req: { user: { id: string } }) {
+    return this.notificationsService.getPreferences(req.user.id);
   }
 
   /**
@@ -156,13 +200,13 @@ export class NotificationsController {
 
   @Patch('preferences')
   @ApiOperation({ summary: 'Update notification preferences' })
-  @ApiBody({
-    schema: {
-      example: { courseUpdates: true, liveSessions: false, tokenRewards: true, pushEnabled: true },
-    },
-  })
+  @ApiBody({ type: UpdateNotificationPreferencesDto })
   @ApiResponse({ status: 200, description: 'Preferences updated successfully' })
-  updatePreferences(@Request() req: { user: { id: string } }, @Body() preferences: any) {
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  updatePreferences(
+    @Request() req: { user: { id: string } },
+    @Body() preferences: UpdateNotificationPreferencesDto,
+  ) {
     return this.notificationsService.updatePreferences(req.user.id, preferences);
   }
 }
