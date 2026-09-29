@@ -91,3 +91,10 @@ app.useGlobalFilters(
 NestJS applies filters from **last to first**, so `ValidationExceptionFilter`
 (registered second) takes priority for `BadRequestException`, while
 `HttpExceptionFilter` handles everything else.
+
+---
+
+## Related Documentation
+
+- [API Error Codes Reference](./api-error-codes.md)
+
