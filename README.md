@@ -358,3 +358,6 @@ Quick summary:
 
 <!-- handsoff-issue-1012 -->
 - #1012: Query parameter injection not sanitized
+
+<!-- handsoff-issue-990 -->
+- #990: Missing course rating and review system
