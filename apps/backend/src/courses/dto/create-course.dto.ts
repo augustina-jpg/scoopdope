@@ -37,5 +37,7 @@ export class CreateCourseDto {
 
   @IsOptional() @IsInt() @Min(0) durationHours?: number;
 
+  @IsOptional() @IsInt() @Min(0) duration?: number;
+
   @IsOptional() @IsBoolean() requiresKyc?: boolean;
 }
