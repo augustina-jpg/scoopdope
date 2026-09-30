@@ -19,4 +19,9 @@ export class UpdateCourseDto {
   @IsOptional() @IsInt() @Min(0) durationHours?: number;
   @IsOptional() @IsInt() @Min(0) duration?: number;
   @IsOptional() @IsBoolean() isPublished?: boolean;
+
+  @IsOptional()
+  @IsIn(['draft', 'published'])
+  @Trim()
+  status?: string;
 }

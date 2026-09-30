@@ -123,5 +123,22 @@ export class Course {
 
   @CreateDateColumn()
   createdAt: Date;
-}
 
+  /**
+   * Whether the course is visible to students.
+   * Draft courses are hidden until an instructor publishes them.
+   */
+  get isVisibleToStudents(): boolean {
+    return this.status === CourseStatus.PUBLISHED;
+  }
+
+  /**
+   * Transition the course from draft to published.
+   * Sets the publish timestamp and keeps the deprecated isPublished flag in sync.
+   */
+  publish(): void {
+    this.status = CourseStatus.PUBLISHED;
+    this.isPublished = true;
+    this.publishedAt = new Date();
+  }
+}
