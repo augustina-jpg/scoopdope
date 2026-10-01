@@ -358,3 +358,6 @@ Quick summary:
 
 <!-- handsoff-issue-1012 -->
 - #1012: Query parameter injection not sanitized
+
+<!-- handsoff-issue-1025 -->
+- #1025: No database indexes on foreign keys
