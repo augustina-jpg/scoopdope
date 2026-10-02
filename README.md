@@ -76,6 +76,8 @@ scoopdope/
 │   └── shared/            # RBAC & shared utilities (Rust/Soroban)
 ├── scripts/               # Build and deploy scripts
 ├── docs/                  # Extended documentation
+│   ├── production-deployment-guide.md # Production deployment & mainnet guide
+│   ├── api-error-codes.md # API numeric error codes reference
 │   ├── api-versioning.md
 │   ├── api-rate-limiting.md
 │   ├── community-moderation.md
@@ -241,6 +243,8 @@ docker compose down -v
 - **Healthchecks**: Backend waits for DB ready
 - Frontend/contracts run separately (npm/yarn)
 
+> For full production setup, Docker orchestration, and Stellar mainnet configuration, see [`docs/production-deployment-guide.md`](./docs/production-deployment-guide.md).
+
 ---
 
 ## Smart Contract Deployment
@@ -306,9 +310,16 @@ All API endpoints are prefixed with `/api/v1` for versioning.
 **Interactive API Documentation:**
 - Local: `http://localhost:3000/api/docs`
 - Production: [https://nonso-eze.github.io/scoopdope/](https://nonso-eze.github.io/scoopdope/)
+- Error Codes Reference: [`docs/api-error-codes.md`](./docs/api-error-codes.md)
 
 **Versioning Policy:**
 All routes use the `/v1` prefix. For details on breaking-change rules, the deprecation timeline (90-day sunset window), header-based version negotiation, and migration examples, see [`docs/api-versioning.md`](./docs/api-versioning.md).
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 ---
 
