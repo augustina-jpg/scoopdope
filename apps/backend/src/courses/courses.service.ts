@@ -174,6 +174,33 @@ export class CoursesService {
     };
   }
 
+  /**
+   * Publish a draft course, transitioning it to the PUBLISHED state so it
+   * becomes visible in the public catalogue. Idempotent for already-published
+   * courses; rejects courses that are not in a publishable state.
+   */
+  async publish(id: string): Promise<Course> {
+    const course = await this.repo.findOne({ where: { id } });
+    if (!course) {
+      throw new NotFoundException(`Course with id ${id} not found`);
+    }
+
+    if (course.status === CourseStatus.PUBLISHED) {
+      return course;
+    }
+
+    if (course.status !== CourseStatus.DRAFT) {
+      throw new BadRequestException(
+        `Only draft courses can be published (current status: ${course.status})`
+      );
+    }
+
+    course.status = CourseStatus.PUBLISHED;
+    const saved = await this.repo.save(course);
+    await this.invalidateCache();
+    return saved;
+  }
+
   /** Read a trimmed cell value by column index, tolerating missing columns. */
   private readCell(cells: string[], index: number): string {
     if (index < 0 || index >= cells.length) return '';
