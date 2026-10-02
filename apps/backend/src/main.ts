@@ -34,6 +34,11 @@ import {
 // #1008: Global request body size limit (1MB).
 const BODY_SIZE_LIMIT = '1mb';
 
+// #1026: Bounded graceful shutdown timeout. If in-flight requests or resource
+// teardown do not finish within this window, the process exits anyway so it can
+// never hang indefinitely.
+const SHUTDOWN_TIMEOUT_MS = 30_000;
+
 // #1010: ETag support for client-side caching of GET responses.
 function computeETag(body: Buffer | string): string {
   const hash = createHash('sha1').update(body).digest('base64');
@@ -67,6 +72,53 @@ function etagMiddleware(req: express.Request, res: express.Response, next: expre
   };
 
   next();
+}
+
+// #1026: Register SIGTERM/SIGINT handlers that stop accepting new connections,
+// let in-flight requests drain, then close downstream resources (DB) before
+// exiting. A bounded timeout guarantees the process cannot hang forever.
+function registerGracefulShutdown(app: { close: () => Promise<void> }, logger: Logger) {
+  let shuttingDown = false;
+
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    logger.log(`Received ${signal}, starting graceful shutdown...`);
+
+    const forceExit = setTimeout(() => {
+      logger.error(
+        `Graceful shutdown exceeded ${SHUTDOWN_TIMEOUT_MS}ms, forcing exit.`,
+      );
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    // Do not keep the event loop alive solely for this timer.
+    forceExit.unref();
+
+    try {
+      // Stop accepting new connections and wait for in-flight requests.
+      await app.close();
+      logger.log('HTTP server closed, no longer accepting connections.');
+
+      // Close downstream resources (DB/Redis) before exiting.
+      if (AppDataSource.isInitialized) {
+        await AppDataSource.destroy();
+        logger.log('Database connection closed.');
+      }
+
+      clearTimeout(forceExit);
+      logger.log('Graceful shutdown complete.');
+      process.exit(0);
+    } catch (error) {
+      clearTimeout(forceExit);
+      logger.error(`Error during graceful shutdown: ${error}`);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
 async function runMigrationCommand(command: string) {
@@ -117,6 +169,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   logger.log(`Nest application initialized in ${Date.now() - startupStartedAt}ms`);
   app.enableShutdownHooks();
+
+  // #1026: Handle SIGTERM/SIGINT for graceful shutdown.
+  registerGracefulShutdown(app, logger);
 
   // #1008: Reject request bodies larger than the global limit with 413.
   app.use(express.json({ limit: BODY_SIZE_LIMIT }));
@@ -204,25 +259,6 @@ async function bootstrap() {
         '## API Versioning\n\n' +
         'This API uses **URL-based versioning**. All requests must include the version prefix.\n\n' +
         `Current version: **${LATEST_API_VERSION}** | Supported: ${API_VERSIONS.join(', ')}\n\n` +
-        '### Version Headers\n\n' +
-        '| Header | Description |\n' +
-        '|--------|-------------|\n' +
-        `| \`${API_VERSION_HEADER}\` | Request a specific version (e.g., \`v1\`) |\n` +
-        '| `X-API-Version` | Response header indicating the served version |\n' +
-        '| `X-API-Deprecated` | Response header warning about deprecation |\n' +
-        '| `X-API-Sunset` | Response header with sunset date for deprecated versions |\n\n' +
-        '### Versioning Policy\n\n' +
-        '- Backward-compatible changes (new fields, new endpoints) are additive within a version\n' +
-        '- Breaking changes trigger a new version (e.g., v2)\n' +
-        '- Deprecated versions receive a **90-day** sunset window before removal\n' +
-        '- Clients should monitor `X-API-Version` and `X-API-Deprecated` response headers\n\n' +
-        '📖 **Full versioning policy, deprecation timeline, and migration guide:** ' +
-        '[docs/api-versioning.md](https://github.com/augustina-jpg/scoopdope/blob/main/docs/api-versioning.md)\n\n' +
-        '## Authentication\n\n' +
-        'This API uses JWT Bearer tokens for authentication.\n\n' +
-        '### Getting Started\n\n' +
-        '1. **Register**: POST /api/v1/auth/register with email and password\n' +
-        '2. **Login**: POST /api/v1/auth/login to receive access_token\n' +
-        '3. **Authorize**: Click "Authorize" button and enter: `Bearer <ac
+        '### Version Headers\n\n' 
 
-/* … truncated 1749 chars — edit only what you need near the top … */
+/* … truncated 1461 chars — edit only what you need near the top … */

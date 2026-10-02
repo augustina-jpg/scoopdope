@@ -1,9 +1,10 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { Module, MiddlewareConsumer, NestModule, OnApplicationShutdown, Injectable } from '@nestjs/common';
+import { TypeOrmModule, InjectDataSource } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { json, urlencoded } from 'express';
+import { DataSource } from 'typeorm';
 
 // ── Entities ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,31 @@ import { EtagMiddleware } from './common/middleware/etag.middleware';
 
 // Global request body size limit (1MB) applied to all routes.
 const BODY_SIZE_LIMIT = '1mb';
+
+// Bounded shutdown timeout so the process cannot hang indefinitely.
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+
+@Injectable()
+export class GracefulShutdownService implements OnApplicationShutdown {
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+
+  async onApplicationShutdown(signal?: string): Promise<void> {
+    // Stop accepting new connections and let in-flight requests drain.
+    // NestJS closes the HTTP server before invoking this hook; here we
+    // release downstream resources (DB pool) with a bounded timeout.
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(resolve, SHUTDOWN_TIMEOUT_MS),
+    );
+
+    const closeResources = (async () => {
+      if (this.dataSource?.isInitialized) {
+        await this.dataSource.destroy();
+      }
+    })();
+
+    await Promise.race([closeResources, timeout]);
+  }
+}
 
 @Module({
   imports: [
@@ -123,6 +149,7 @@ const BODY_SIZE_LIMIT = '1mb';
       provide: APP_GUARD,
       useClass: UserRateLimitGuard,
     },
+    GracefulShutdownService,
   ],
 })
 export class AppModule implements NestModule {
