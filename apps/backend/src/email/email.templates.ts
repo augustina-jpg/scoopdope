@@ -199,6 +199,25 @@ export const emailTemplates = {
     };
   },
 
+  rewardEarned: (data: { userName: string; amount: number; courseTitle: string; txHash: string; unsubscribeUrl: string }): EmailTemplate => {
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2>🎉 BST Tokens Earned!</h2>
+        <p>Hi ${data.userName},</p>
+        <p>You've earned <strong>${data.amount} BST</strong> for completing "${data.courseTitle}".</p>
+        <p>Transaction: <code>${data.txHash}</code></p>
+        <p style="margin-top:40px;font-size:12px;color:#999">
+          <a href="${data.unsubscribeUrl}">Unsubscribe</a>
+        </p>
+      </div>`;
+
+    return {
+      subject: `You earned ${data.amount} BST tokens!`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
+
   calendarInvite: (data: { userName: string; sessionTitle: string; date: string; duration: number; joinUrl?: string; sessionUrl: string }): EmailTemplate => {
     const html = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">

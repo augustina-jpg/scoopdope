@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StellarService } from '../stellar/stellar.service';
 import { User } from '../users/user.entity';
 import { Reward, RewardType } from './reward.entity';
@@ -26,6 +27,7 @@ export class RewardsService {
     @InjectRepository(Reward) private readonly rewardRepo: Repository<Reward>,
     private readonly stellarService: StellarService,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   calculateEarnedTokens(type: RewardType): number {
@@ -94,6 +96,16 @@ export class RewardsService {
       `Reward claimed: user=${userId} type=${dto.type} amount=${amount} reference=${dto.referenceId}`,
     );
 
+    this.eventEmitter.emit('reward.earned', {
+      userId,
+      amount,
+      type: dto.type,
+      referenceId: dto.referenceId,
+      reason: savedReward.reason,
+      txHash: savedReward.txHash,
+      claimedAt: savedReward.claimedAt,
+    });
+
     return {
       userId,
       amount,
@@ -109,5 +121,41 @@ export class RewardsService {
       where: { userId },
       order: { claimedAt: 'DESC' },
     });
+  }
+
+  async rollback(rewardId: string, userId: string): Promise<void> {
+    const reward = await this.rewardRepo.findOne({
+      where: { id: rewardId, userId },
+    });
+
+    if (!reward) {
+      throw new NotFoundException('Reward not found');
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const nextBalance = Number(user.rewardBalance ?? 0) - reward.amount;
+    await this.userRepo.save({
+      ...user,
+      rewardBalance: nextBalance,
+    });
+
+    await this.rewardRepo.remove(reward);
+
+    this.eventEmitter.emit('reward.rolled_back', {
+      userId,
+      amount: reward.amount,
+      type: reward.type,
+      referenceId: reward.referenceId,
+      reason: reward.reason,
+      rewardId: reward.id,
+    });
+
+    this.logger.log(
+      `Reward rolled back: user=${userId} rewardId=${rewardId} amount=${reward.amount}`,
+    );
   }
 }

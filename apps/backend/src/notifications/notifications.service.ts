@@ -120,6 +120,9 @@ export class NotificationsService {
         case NotificationType.ANNOUNCEMENT:
           shouldSendPush = prefs.announcements;
           break;
+        case NotificationType.REWARD_EARNED:
+          shouldSendPush = prefs.tokenRewards;
+          break;
       }
 
       if (shouldSendPush) {

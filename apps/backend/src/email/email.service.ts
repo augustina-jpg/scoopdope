@@ -273,6 +273,21 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
   }
 
+  @OnEvent('reward.earned')
+  async onRewardEarned(payload: { userId: string; userEmail: string; userName: string; amount: number; courseTitle: string; txHash: string }) {
+    const prefs = await this.getOrCreatePrefs(payload.userId);
+    if (prefs.unsubscribedAll || !prefs.rewardEarned) return;
+
+    const tpl = emailTemplates.rewardEarned({
+      userName: payload.userName,
+      amount: payload.amount,
+      courseTitle: payload.courseTitle,
+      txHash: payload.txHash,
+      unsubscribeUrl: this.unsubscribeUrl(prefs.unsubscribeToken),
+    });
+    await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
+  }
+
   @OnEvent('module.unlocked')
   async onModuleUnlocked(payload: { userId: string; userEmail: string; userName: string; courseId: string; courseTitle: string; moduleTitle: string }) {
     const prefs = await this.getOrCreatePrefs(payload.userId);

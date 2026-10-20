@@ -11,6 +11,7 @@ import { Progress } from '../progress/progress.entity';
 import { Review } from '../courses/review.entity';
 import { User } from '../users/user.entity';
 import { Course, CourseStatus } from '../courses/course.entity';
+import { RewardEvent } from './reward-event.entity';
 
 export interface PlatformAnalytics {
   totalUsers: number;
@@ -54,6 +55,7 @@ export class AnalyticsService {
     @InjectRepository(Review) private reviewRepo: Repository<Review>,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Course) private courseRepo: Repository<Course>,
+    @InjectRepository(RewardEvent) private rewardEventRepo: Repository<RewardEvent>,
     @Inject(CACHE_MANAGER) private cache: Cache,
     private readonly distributedLockService: DistributedLockService,
   ) {}
@@ -272,6 +274,27 @@ export class AnalyticsService {
 
     await this.cache.set(cacheKey, result, this.CACHE_TTL);
     return result;
+  }
+
+  async recordRewardEvent(payload: {
+    userId: string;
+    amount: number;
+    type: string;
+    referenceId: string;
+    reason: string;
+    txHash: string | null;
+    claimedAt: Date;
+  }): Promise<void> {
+    await this.rewardEventRepo.save(
+      this.rewardEventRepo.create({
+        userId: payload.userId,
+        type: payload.type as any,
+        referenceId: payload.referenceId,
+        amount: payload.amount,
+        reason: payload.reason,
+        txHash: payload.txHash,
+      }),
+    );
   }
 
   /** Hourly: aggregate all courses */

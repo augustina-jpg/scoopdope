@@ -13,6 +13,8 @@ export enum NotificationType {
   // #867: new types for the notification center
   CERTIFICATE = 'certificate',
   UPDATE = 'update',
+  // #1168: reward event notification type
+  REWARD_EARNED = 'reward_earned',
 }
 
 @Entity('notifications')
