@@ -47,8 +47,14 @@ export const handlers = [
       bio: '',
       createdAt: '2024-01-01T00:00:00.000Z',
       stellarPublicKey: 'GABC...',
+      themePreference: 'dark',
     })
   ),
+
+  http.patch(`${BASE}/users/user-1`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ ...body, id: 'user-1', themePreference: body.theme ?? 'system' });
+  }),
 
   http.get(`${BASE}/credentials/:userId`, () =>
     HttpResponse.json([

@@ -1,11 +1,11 @@
 'use client';
 
-import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { useThemeStore } from '@/store/theme.store';
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useThemeStore();
   const t = useTranslations('nav');
   const [mounted, setMounted] = useState(false);
 

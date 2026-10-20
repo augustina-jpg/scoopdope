@@ -224,6 +224,7 @@ export class AuthService {
         avatar: user.avatar ?? null,
         username: user.username ?? null,
         createdAt: user.createdAt,
+        themePreference: user.themePreference ?? 'system',
       },
     };
   }
