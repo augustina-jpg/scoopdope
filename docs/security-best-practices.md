@@ -136,9 +136,31 @@ repo.query(`SELECT * FROM user WHERE email = '${email}'`);
 | `REDIS_PASSWORD` | High | Enable AUTH in Redis |
 | `NEXT_PUBLIC_*` | Public | Safe to expose to browser |
 
+### Stellar Keypair Log Sanitization
+
+The Stellar keypair (`Keypair.fromSecret(STELLAR_SECRET_KEY)`) contains both the public key and the secret key. Logging the keypair object directly would expose the secret key to stdout and any aggregated log service (CloudWatch, third-party log shippers, etc.).
+
+**Policy:**
+
+- `STELLAR_SECRET_KEY` must **never** appear in application logs — not during startup, not during operation, not in error stack traces.
+- When logging Stellar identity information, log **only the `publicKey`**:
+
+```typescript
+// Safe
+this.logger.log(`Stellar account: ${keypair.publicKey()}`);
+
+// Never do this — leaks the secret key
+this.logger.debug(`Stellar keypair: ${JSON.stringify(keypair)}`);
+```
+
+- The application logger applies a masking rule that redacts any value matching the `STELLAR_SECRET_KEY` pattern (Stellar secret seeds start with `S` and are 56 characters) before output. This is a defense-in-depth measure — do not rely on it to justify logging secrets.
+- Log shipping configurations must include a `STELLAR_SECRET_KEY` masking/redaction rule so that any accidental leak is scrubbed before leaving the host.
+- A unit test asserts that the secret key never appears in log output; introducing secret-key logging will fail CI.
+
 ### What Not to Do
 
 - Do not log secrets, tokens, or passwords — audit log statements before merging.
+- Do not log the Stellar keypair object — log only `keypair.publicKey()` (see above).
 - Do not hardcode secrets in source code, Dockerfiles, or CI config files.
 - Do not share secrets over Slack, email, or unencrypted channels.
 
