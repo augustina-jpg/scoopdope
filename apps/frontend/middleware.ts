@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import createMiddleware from 'next-intl/middleware';
 import { generateNonce, buildCSPHeader, CSP_CONFIG } from '@/lib/csp';
+import { routing } from './src/i18n/routing';
+
+const handleI18nRouting = createMiddleware(routing);
 
 export function middleware(request: NextRequest) {
   const nonce = generateNonce();
@@ -13,12 +17,13 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
 
-  // Create response with CSP headers
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  const middlewareRequest = new NextRequest(request, { headers: requestHeaders });
+  const pathname = request.nextUrl.pathname;
+  const isPageRequest =
+    !/^\/(?:api|_next|_vercel)(?:\/|$)/.test(pathname) && !pathname.includes('.');
+  const response = isPageRequest
+    ? handleI18nRouting(middlewareRequest)
+    : NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set('Content-Security-Policy', cspHeader);
   response.headers.set('Content-Security-Policy-Report-Only', cspHeader);
