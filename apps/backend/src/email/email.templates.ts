@@ -1,4 +1,106 @@
+const htmlEntities: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (character) => htmlEntities[character]);
+
+const applicationMessages = {
+  en: {
+    receivedSubject: 'Application Received',
+    receivedTitle: 'We received your instructor application',
+    receivedBody:
+      'Thank you for applying to become an instructor. We will review your application and email you when a decision is made.',
+    approvedSubject: 'Application Approved',
+    approvedTitle: 'Your instructor application is approved',
+    approvedBody: 'Congratulations! You are now approved to teach on ScoopDope.',
+    rejectedSubject: 'Application Rejected',
+    rejectedTitle: 'Your instructor application was not approved',
+    rejectedBody: 'Thank you for your interest in teaching on ScoopDope. Reviewer feedback:',
+    greeting: 'Hello',
+  },
+  es: {
+    receivedSubject: 'Solicitud recibida',
+    receivedTitle: 'Hemos recibido tu solicitud para ser instructor',
+    receivedBody:
+      'Gracias por solicitar convertirte en instructor. Revisaremos tu solicitud y te enviaremos un correo cuando tomemos una decisión.',
+    approvedSubject: 'Solicitud aprobada',
+    approvedTitle: 'Tu solicitud para ser instructor ha sido aprobada',
+    approvedBody: '¡Enhorabuena! Ya puedes impartir cursos en ScoopDope.',
+    rejectedSubject: 'Solicitud rechazada',
+    rejectedTitle: 'Tu solicitud para ser instructor no ha sido aprobada',
+    rejectedBody: 'Gracias por tu interés en enseñar en ScoopDope. Comentarios del revisor:',
+    greeting: 'Hola',
+  },
+  fr: {
+    receivedSubject: 'Candidature reçue',
+    receivedTitle: 'Nous avons reçu votre candidature pour enseigner',
+    receivedBody:
+      'Merci d’avoir souhaité devenir formateur. Nous étudierons votre candidature et vous informerons par e-mail de notre décision.',
+    approvedSubject: 'Candidature approuvée',
+    approvedTitle: 'Votre candidature pour enseigner est approuvée',
+    approvedBody: 'Félicitations ! Vous pouvez désormais enseigner sur ScoopDope.',
+    rejectedSubject: 'Candidature rejetée',
+    rejectedTitle: 'Votre candidature pour enseigner n’a pas été approuvée',
+    rejectedBody:
+      'Merci de votre intérêt pour ScoopDope. Commentaire de la personne chargée de l’examen :',
+    greeting: 'Bonjour',
+  },
+  ar: {
+    receivedSubject: 'تم استلام الطلب',
+    receivedTitle: 'لقد استلمنا طلبك لتصبح مدرّسًا',
+    receivedBody:
+      'شكرًا لتقديم طلبك لتصبح مدرّسًا. سنراجع طلبك ونرسل إليك بريدًا إلكترونيًا عند اتخاذ القرار.',
+    approvedSubject: 'تمت الموافقة على الطلب',
+    approvedTitle: 'تمت الموافقة على طلبك لتصبح مدرّسًا',
+    approvedBody: 'تهانينا! يمكنك الآن التدريس على ScoopDope.',
+    rejectedSubject: 'تم رفض الطلب',
+    rejectedTitle: 'لم تتم الموافقة على طلبك لتصبح مدرّسًا',
+    rejectedBody: 'شكرًا لاهتمامك بالتدريس على ScoopDope. ملاحظات المراجع:',
+    greeting: 'مرحبًا',
+  },
+};
+
+type ApplicationLocale = keyof typeof applicationMessages;
+
+const applicationTemplate = (
+  kind: 'received' | 'approved' | 'rejected',
+  data: { userName: string; locale?: string; adminNote?: string | null }
+) => {
+  const locale = (data.locale || 'en').split('-')[0] as ApplicationLocale;
+  const messages = applicationMessages[locale] || applicationMessages.en;
+  const title = messages[`${kind}Title`];
+  const body = messages[`${kind}Body`];
+  const reviewerFeedback =
+    kind === 'rejected' && data.adminNote
+      ? `<blockquote>${escapeHtml(data.adminNote)}</blockquote>`
+      : '';
+
+  return {
+    subject: messages[`${kind}Subject`],
+    html: `<div lang="${locale}" dir="${locale === 'ar' ? 'rtl' : 'ltr'}" style="font-family:sans-serif;max-width:600px;margin:0 auto">
+      <h2>${title}</h2>
+      <p>${messages.greeting} ${escapeHtml(data.userName)},</p>
+      <p>${body}</p>
+      ${reviewerFeedback}
+    </div>`,
+  };
+};
+
 export const emailTemplates = {
+  applicationReceived: (data: { userName: string; locale?: string }) =>
+    applicationTemplate('received', data),
+
+  applicationApproved: (data: { userName: string; locale?: string }) =>
+    applicationTemplate('approved', data),
+
+  applicationRejected: (data: { userName: string; locale?: string; adminNote?: string | null }) =>
+    applicationTemplate('rejected', data),
+
   enrollment: (data: { userName: string; courseTitle: string; courseUrl: string; unsubscribeUrl: string }) => ({
     subject: `You're enrolled in "${data.courseTitle}"`,
     html: `
@@ -10,12 +112,17 @@ export const emailTemplates = {
         <p style="margin-top:40px;font-size:12px;color:#999">
           <a href="${data.unsubscribeUrl}">Unsubscribe</a>
         </p>
-      </div>`,
-  }),
+      </div>`;
+    
+    return {
+      subject: `You're enrolled in "${data.courseTitle}"`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
 
-  completion: (data: { userName: string; courseTitle: string; credentialUrl: string; unsubscribeUrl: string }) => ({
-    subject: `Congratulations! You completed "${data.courseTitle}"`,
-    html: `
+  completion: (data: { userName: string; courseTitle: string; credentialUrl: string; unsubscribeUrl: string }): EmailTemplate => {
+    const html = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
         <h2>🎉 Course Completed!</h2>
         <p>Hi ${data.userName},</p>
@@ -24,12 +131,17 @@ export const emailTemplates = {
         <p style="margin-top:40px;font-size:12px;color:#999">
           <a href="${data.unsubscribeUrl}">Unsubscribe</a>
         </p>
-      </div>`,
-  }),
+      </div>`;
+    
+    return {
+      subject: `Congratulations! You completed "${data.courseTitle}"`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
 
-  credentialIssued: (data: { userName: string; courseTitle: string; txHash: string; unsubscribeUrl: string }) => ({
-    subject: `Your blockchain credential for "${data.courseTitle}" is ready`,
-    html: `
+  credentialIssued: (data: { userName: string; courseTitle: string; txHash: string; unsubscribeUrl: string }): EmailTemplate => {
+    const html = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
         <h2>🏆 Credential Issued on Stellar</h2>
         <p>Hi ${data.userName},</p>
@@ -38,12 +150,17 @@ export const emailTemplates = {
         <p style="margin-top:40px;font-size:12px;color:#999">
           <a href="${data.unsubscribeUrl}">Unsubscribe</a>
         </p>
-      </div>`,
-  }),
+      </div>`;
+    
+    return {
+      subject: `Your blockchain credential for "${data.courseTitle}" is ready`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
 
-  moduleUnlocked: (data: { userName: string; courseTitle: string; moduleTitle: string; courseUrl: string; unsubscribeUrl: string }) => ({
-    subject: `New content unlocked in "${data.courseTitle}"`,
-    html: `
+  moduleUnlocked: (data: { userName: string; courseTitle: string; moduleTitle: string; courseUrl: string; unsubscribeUrl: string }): EmailTemplate => {
+    const html = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
         <h2>🔓 New Module Available</h2>
         <p>Hi ${data.userName},</p>
@@ -53,12 +170,17 @@ export const emailTemplates = {
         <p style="margin-top:40px;font-size:12px;color:#999">
           <a href="${data.unsubscribeUrl}">Unsubscribe</a>
         </p>
-      </div>`,
-  }),
+      </div>`;
+    
+    return {
+      subject: `New content unlocked in "${data.courseTitle}"`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
 
-  liveSessionReminder: (data: { userName: string; sessionTitle: string; date: string; timeLabel: string; joinUrl: string; sessionUrl: string }) => ({
-    subject: `⏰ Reminder: "${data.sessionTitle}" starts in ${data.timeLabel}`,
-    html: `
+  liveSessionReminder: (data: { userName: string; sessionTitle: string; date: string; timeLabel: string; joinUrl: string; sessionUrl: string }): EmailTemplate => {
+    const html = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
         <h2>⏰ Session starting in ${data.timeLabel}</h2>
         <p>Hi ${data.userName},</p>
@@ -68,12 +190,17 @@ export const emailTemplates = {
           ${data.joinUrl ? `<li><strong>Join:</strong> <a href="${data.joinUrl}">${data.joinUrl}</a></li>` : ''}
         </ul>
         <a href="${data.joinUrl || data.sessionUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Join Now</a>
-      </div>`,
-  }),
+      </div>`;
+    
+    return {
+      subject: `⏰ Reminder: "${data.sessionTitle}" starts in ${data.timeLabel}`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
 
-  calendarInvite: (data: { userName: string; sessionTitle: string; date: string; duration: number; joinUrl?: string; sessionUrl: string }) => ({
-    subject: `📅 Live Session: ${data.sessionTitle}`,
-    html: `
+  calendarInvite: (data: { userName: string; sessionTitle: string; date: string; duration: number; joinUrl?: string; sessionUrl: string }): EmailTemplate => {
+    const html = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
         <h2>📅 You're invited to a live session</h2>
         <p>Hi ${data.userName},</p>
@@ -85,6 +212,12 @@ export const emailTemplates = {
         </ul>
         <p>Add to your calendar using the attached .ics file.</p>
         <a href="${data.sessionUrl}" style="background:#4F46E5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">View Session</a>
-      </div>`,
-  }),
+      </div>`;
+    
+    return {
+      subject: `📅 Live Session: ${data.sessionTitle}`,
+      html,
+      text: htmlToPlainText(html),
+    };
+  },
 };

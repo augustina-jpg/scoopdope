@@ -5,6 +5,7 @@ export const validationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3000),
   LOG_FORMAT: Joi.string().valid('text', 'json').default('text'),
+  ENABLE_SWAGGER: Joi.boolean().default(false),
 
   // Database
   DATABASE_HOST: Joi.string().required(),
@@ -12,7 +13,9 @@ export const validationSchema = Joi.object({
   DATABASE_USER: Joi.string().required(),
   DATABASE_PASSWORD: Joi.string().required(),
   DATABASE_NAME: Joi.string().required(),
-  DATABASE_POOL_SIZE: Joi.number().min(1).max(200).default(50),
+  DATABASE_POOL_MIN: Joi.number().integer().min(1).max(20).default(5),
+  DATABASE_POOL_MAX: Joi.number().integer().min(5).max(100).default(20),
+  DATABASE_IDLE_TIMEOUT_MS: Joi.number().integer().min(1000).default(30000),
 
   // JWT
   JWT_SECRET: Joi.string().min(16).required(),
@@ -88,6 +91,7 @@ export const validationSchema = Joi.object({
   STRIPE_WEBHOOK_SECRET: Joi.string().allow('').default(''),
   STRIPE_PRO_PRICE_ID: Joi.string().allow('').default(''),
   STRIPE_ENTERPRISE_PRICE_ID: Joi.string().allow('').default(''),
+  STRIPE_SUBSCRIPTION_PRORATION_ENABLED: Joi.boolean().default(true),
 
   // Exchange Rate (optional — falls back to free open.er-api.com)
   EXCHANGE_RATE_API_KEY: Joi.string().allow('').default(''),
@@ -97,4 +101,8 @@ export const validationSchema = Joi.object({
 
   // Payouts
   PAYOUT_BATCH_SIZE: Joi.number().integer().min(1).default(500),
+
+  // Rewards
+  REWARD_MODULE_COMPLETION: Joi.number().integer().min(0).default(25),
+  REWARD_COURSE_COMPLETION: Joi.number().integer().min(0).default(100),
 });
