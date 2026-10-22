@@ -21,6 +21,9 @@ export class ModerationItem {
   @Column()
   reportedByUserId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  contentOwnerUserId: string | null;
+
   @Column({ type: 'enum', enum: ModerationStatus, default: ModerationStatus.PENDING })
   status: ModerationStatus;
 
