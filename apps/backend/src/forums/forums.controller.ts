@@ -9,7 +9,13 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
@@ -32,19 +38,40 @@ export class ForumsController {
   constructor(private readonly forumsService: ForumsService) {}
 
   @Get('forums/threads')
-  @ApiOperation({ summary: 'List all forum threads with pagination' })
-  @ApiResponse({ status: 200, description: 'Returns paginated forum threads' })
+  @ApiOperation({ summary: 'List all forum threads across courses with cursor pagination' })
+  @ApiQuery({
+    name: 'after',
+    required: false,
+    description:
+      'Cursor for the next page: base64-encoded "<ISO-timestamp>_<id>" of the last thread from the previous page',
+    example: 'MjAyNC0wMS0wMVQwMDowMDowMC4wMDBaXzEyMw==',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Maximum number of threads to return (default 20)',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'courseId',
+    required: false,
+    description: 'Filter threads by course ID',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Returns cursor-paginated forum threads as { data, nextCursor, hasMore }',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   listThreads(
-    @Query('page') page?: string,
+    @Query('after') after?: string,
     @Query('limit') limit?: string,
     @Query('courseId') courseId?: string,
   ) {
-    const parsedPage = page ? parseInt(page, 10) : 1;
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.forumsService.findThreads(parsedPage, parsedLimit, courseId);
+    return this.forumsService.findThreads(after, parsedLimit, courseId);
   }
 
   @Get('courses/:id/posts')
@@ -58,21 +85,6 @@ export class ForumsController {
   @ApiResponse({ status: 200, description: 'Returns course forum posts' })
   findByCourse(@Param('id') courseId: string) {
     return this.forumsService.findPostsByCourse(courseId);
-  }
-
-  @Get('forums/threads')
-  @ApiOperation({ summary: 'List all forum threads across courses with pagination' })
-  @ApiResponse({ status: 200, description: 'Returns paginated list of forum threads' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
-  findThreads(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('courseId') courseId?: string,
-  ) {
-    const parsedPage = page ? parseInt(page, 10) : 1;
-    const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.forumsService.findThreads(parsedPage, parsedLimit, courseId);
   }
 
   @Get('forums/threads/:id')

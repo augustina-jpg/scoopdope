@@ -1,3 +1,41 @@
+/**
+ * Parse a region-to-tax-rate map from an environment variable.
+ *
+ * Accepted formats (comma-separated entries, `:` or `=` as separator):
+ *   "US-CA:0.0725,DE:0.19,AE:0"
+ *
+ * Returns an empty object when the input is missing or malformed.
+ */
+function parseTaxRegionRates(raw?: string): Record<string, number> {
+  const rates: Record<string, number> = {};
+  if (!raw) {
+    return rates;
+  }
+
+  for (const entry of raw.split(',')) {
+    const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf(':') !== -1 ? trimmed.indexOf(':') : trimmed.indexOf('=');
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const region = trimmed.slice(0, separatorIndex).trim().toUpperCase();
+    const rate = parseFloat(trimmed.slice(separatorIndex + 1).trim());
+
+    if (!region || Number.isNaN(rate) || rate < 0) {
+      continue;
+    }
+
+    rates[region] = rate;
+  }
+
+  return rates;
+}
+
 function buildRedisUrl(): string {
   if (process.env.REDIS_URL) {
     return process.env.REDIS_URL;

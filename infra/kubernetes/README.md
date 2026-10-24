@@ -255,16 +255,18 @@ Key environment variables configured via ConfigMap and Secret:
 ## Scaling
 
 ### Horizontal Pod Autoscaling (HPA)
-To enable automatic scaling based on CPU/memory:
 
-```bash
-kubectl autoscale deployment scoopdope-backend \
-  --min=3 \
-  --max=10 \
-  --cpu-percent=70
-```
+Automatic horizontal scaling is configured via the `backend-hpa.yaml` manifest, which is included in `kustomization.yaml` and targets the `scoopdope-backend` Deployment.
 
-Or create an HPA resource:
+**Configuration:**
+- **Manifest**: `backend-hpa.yaml` (`autoscaling/v2` HorizontalPodAutoscaler named `scoopdope-backend-hpa`)
+- **Scale Target**: `scoopdope-backend` Deployment
+- **Min Replicas**: 2 (ensures high availability)
+- **Max Replicas**: 10
+- **Scale-Out Triggers**:
+  - CPU utilization > 70% (average across pods)
+  - Memory utilization > 80% (average across pods)
+
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -275,7 +277,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: scoopdope-backend
-  minReplicas: 3
+  minReplicas: 2
   maxReplicas: 10
   metrics:
   - type: Resource
@@ -290,6 +292,26 @@ spec:
       target:
         type: Utilization
         averageUtilization: 80
+```
+
+**Expected Scaling Behavior:**
+- Under normal load, the backend runs at the minimum of 2 replicas.
+- When average CPU utilization exceeds 70% or average memory utilization exceeds 80%, the HPA adds pods (up to 10) to absorb the traffic spike.
+- As load subsides and utilization drops below the thresholds, the HPA scales back down toward 2 replicas.
+- Scaling decisions are based on the resource requests defined in `backend-deployment.yaml`, so keep requests accurate — utilization is measured relative to requests, not limits.
+
+**Note:** The HPA requires the `metrics-server` add-on to be installed in the cluster.
+
+**Verify HPA status:**
+```bash
+kubectl get hpa scoopdope-backend-hpa
+kubectl describe hpa scoopdope-backend-hpa
+```
+
+**Load testing:** During a load test, watch the replica count increase:
+```bash
+kubectl get hpa scoopdope-backend-hpa -w
+kubectl get pods -l app=scoopdope-backend -w
 ```
 
 ## Monitoring & Observability
