@@ -130,6 +130,9 @@ export class User {
   @Column({ nullable: true, type: 'timestamp' })
   lockoutUntil: Date | null;
 
+  @Column({ default: 'system' })
+  themePreference: 'light' | 'dark' | 'system';
+
   @CreateDateColumn()
   createdAt: Date;
 }

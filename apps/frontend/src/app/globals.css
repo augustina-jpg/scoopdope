@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme tokens — toggled via the `dark` class set by next-themes */
+/* Theme tokens — toggled via the `dark` class set by the theme store */
 :root {
   --background: #ffffff;
   --foreground: #111827;

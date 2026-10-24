@@ -82,6 +82,7 @@ export class UsersService {
       createdAt: user.createdAt,
       enrollmentCount,
       completedCoursesCount,
+      themePreference: user.themePreference ?? 'system',
     };
 
     if (viewerId && viewerId === user.id) {
@@ -123,6 +124,7 @@ export class UsersService {
     'avatar',
     'bio',
     'email',
+    'theme',
   ]);
 
   private pickAllowedFields(data: Partial<User>): Partial<User> {
@@ -151,6 +153,12 @@ export class UsersService {
     if ('profilePictureUrl' in normalised && normalised['profilePictureUrl'] !== undefined) {
       normalised['avatar'] = normalised['profilePictureUrl'];
       delete normalised['profilePictureUrl'];
+    }
+
+    // Normalise theme → themePreference so the DTO field maps to the entity column
+    if ('theme' in normalised && normalised['theme'] !== undefined) {
+      normalised['themePreference'] = normalised['theme'];
+      delete normalised['theme'];
     }
 
     const allowed = this.pickAllowedFields(normalised as Partial<User>);
