@@ -12,7 +12,7 @@ import { LeaderboardsController } from './leaderboards.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Enrollment, Progress, Course]), StellarModule, MetricsModule],
-  providers: [LeaderboardService],
+  providers: [LeaderboardService, LeaderboardEvents],
   controllers: [LeaderboardController, LeaderboardsController],
 })
 export class LeaderboardModule {}

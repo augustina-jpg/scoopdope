@@ -59,6 +59,16 @@ export class NotificationsEvents {
       `A spot opened up! You've been enrolled in "${payload.courseTitle}" from the waitlist.`,
     );
   }
+
+  @OnEvent('reward.earned')
+  async handleRewardEarned(payload: { userId: string; amount: number; type: string; reason: string }) {
+    await this.notificationsService.create(
+      payload.userId,
+      NotificationType.REWARD_EARNED,
+      `You earned ${payload.amount} BST tokens for "${payload.reason}"`,
+      'Reward Earned',
+    );
+  }
 }
 
 interface ApplicationEmailPayload {

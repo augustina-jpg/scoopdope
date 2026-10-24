@@ -10,6 +10,7 @@ import { User } from '../users/user.entity';
 import { Course } from '../courses/course.entity';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
+import { AnalyticsEvents } from './analytics.events';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { AnalyticsController } from './analytics.controller';
       Course,
     ]),
   ],
-  providers: [AnalyticsService],
+  providers: [AnalyticsService, AnalyticsEvents],
   controllers: [AnalyticsController],
   exports: [AnalyticsService],
 })

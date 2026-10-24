@@ -205,6 +205,19 @@ export class LeaderboardService {
   }
 
   /**
+   * Invalidates the leaderboard caches so that the next read
+   * recalculates scores. Used by event subscribers (e.g. reward.earned)
+   * to keep the leaderboard fresh within seconds of a state change.
+   */
+  async invalidateLeaderboardCache(): Promise<void> {
+    await this.cacheManager.del(this.cacheKey);
+    await this.cacheManager.del(`leaderboard:daily:${this.getUtcDateKey()}:completion_rate`);
+    await this.cacheManager.del(`leaderboard:daily:${this.getUtcDateKey()}:study_hours`);
+    await this.cacheManager.del(`leaderboard:daily:${this.getUtcDateKey()}:courses_completed`);
+    await this.cacheManager.del('leaderboard:streaks:top50');
+  }
+
+  /**
    * Returns the top 50 users ranked by their current learning streak.
    * Ties are broken by longest-streak descending, then by most-recent
    * activity, so active learners always appear first.
