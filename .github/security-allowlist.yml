@@ -1,0 +1,51 @@
+# Security Allowlist
+#
+# This file documents known false-positive or accepted-risk advisories that are
+# exempted from the dependency vulnerability scanning workflow
+# (.github/workflows/dependency-vulnerability-scanning.yml).
+#
+# RULES
+# -----
+# 1. Every entry MUST include an `expires` date in ISO format (YYYY-MM-DD).
+#    Entries whose `expires` date is in the past are treated as EXPIRED and are
+#    no longer honored by the scanning workflow (the advisory will fail the build).
+# 2. Every entry MUST include a `reason` explaining why the advisory is a false
+#    positive or why the risk is accepted.
+# 3. Every entry SHOULD include a `reference` (link to the advisory or issue).
+# 4. Entries are reviewed monthly as part of the scheduled vulnerability report.
+# 5. Keep the list as short as possible. Fix the dependency instead of
+#    allowlisting it whenever feasible.
+#
+# SCHEMA
+# ------
+# npm:
+#   - id: <GHSA or CVE identifier, e.g. GHSA-xxxx-xxxx-xxxx>
+#     package: <npm package name>
+#     reason: <why this is allowlisted>
+#     reference: <optional URL>
+#     expires: <YYYY-MM-DD>
+#
+# cargo:
+#   - id: <RUSTSEC advisory identifier, e.g. RUSTSEC-2024-0001>
+#     package: <crate name>
+#     reason: <why this is allowlisted>
+#     reference: <optional URL>
+#     expires: <YYYY-MM-DD>
+
+npm: []
+# Example:
+# npm:
+#   - id: GHSA-xxxx-xxxx-xxxx
+#     package: example-package
+#     reason: Vulnerable code path is not reachable in our usage.
+#     reference: https://github.com/advisories/GHSA-xxxx-xxxx-xxxx
+#     expires: 2025-12-31
+
+cargo: []
+# Example:
+# cargo:
+#   - id: RUSTSEC-2024-0001
+#     package: example-crate
+#     reason: Transitive dev-only dependency; not shipped in release builds.
+#     reference: https://rustsec.org/advisories/RUSTSEC-2024-0001
+#     expires: 2025-12-31

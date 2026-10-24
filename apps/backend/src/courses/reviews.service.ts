@@ -5,11 +5,12 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Course } from './course.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
+import { UpdateReviewDto } from './dto/update-review.dto';
 import { Review } from './review.entity';
 
 @Injectable()
@@ -48,6 +49,31 @@ export class ReviewsService {
       comment: dto.comment?.trim() || null,
     });
 
+    try {
+      return await this.reviewRepo.save(review);
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException('You have already reviewed this course');
+      }
+      throw error;
+    }
+  }
+
+  async updateReview(courseId: string, userId: string, dto: UpdateReviewDto) {
+    await this.ensureCourseExists(courseId);
+
+    const review = await this.reviewRepo.findOne({ where: { courseId, userId } });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    if (dto.rating !== undefined) {
+      review.rating = dto.rating;
+    }
+    if (dto.comment !== undefined) {
+      review.comment = dto.comment?.trim() || null;
+    }
+
     return this.reviewRepo.save(review);
   }
 
@@ -81,6 +107,15 @@ export class ReviewsService {
     }
     review.flagged = true;
     return this.reviewRepo.save(review);
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+    const driverError = (error as QueryFailedError & { driverError?: { code?: string } })
+      .driverError;
+    return driverError?.code === '23505';
   }
 
   private async ensureCourseExists(courseId: string) {
