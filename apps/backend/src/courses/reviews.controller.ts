@@ -29,6 +29,22 @@ export class ReviewsController {
     return this.reviewsService.create(courseId, req.user.id, dto);
   }
 
+  @Patch('courses/:id/reviews')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the authenticated user\'s existing review for a course' })
+  @ApiResponse({ status: 200, description: 'Review updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Course or review not found' })
+  @ApiResponse({ status: 409, description: 'Conflict' })
+  update(
+    @Param('id') courseId: string,
+    @Request() req: { user: { id: string } },
+    @Body() dto: CreateReviewDto
+  ) {
+    return this.reviewsService.updateReview(courseId, req.user.id, dto);
+  }
+
   @Patch('courses/:id/reviews/:reviewId/flag')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

@@ -16,8 +16,75 @@ export const openApiSpec = {
   servers: [{ url: '/api', description: 'API base path' }],
   tags: [
     { name: 'Lessons', description: 'Lesson management endpoints' },
+    { name: 'Forums', description: 'Forum thread endpoints' },
+    { name: 'Payments', description: 'Payment and invoice endpoints' },
   ],
   paths: {
+    '/forums/threads': {
+      get: {
+        tags: ['Forums'],
+        summary: 'List forum threads',
+        description:
+          'Cursor-based pagination. Pass the `nextCursor` value from a previous response as `after` to fetch the next page.',
+        operationId: 'listForumThreads',
+        parameters: [
+          {
+            name: 'after',
+            in: 'query',
+            required: false,
+            description:
+              'Opaque base64-encoded cursor of the form `<base64-encoded-ISO-timestamp>_<id>`. Omit to start from the first page.',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            description: 'Maximum number of threads to return.',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'A page of forum threads',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ForumThreadPage' },
+              },
+            },
+          },
+          '400': { description: 'Invalid cursor or limit' },
+        },
+      },
+    },
+    '/payments/{id}/invoice': {
+      get: {
+        tags: ['Payments'],
+        summary: 'Download the tax-inclusive invoice PDF for a payment',
+        operationId: 'getPaymentInvoice',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': {
+            description:
+              'The invoice PDF. Tax-inclusive fields (taxRate, taxAmount, taxJurisdiction, subtotal, total) are rendered in the document.',
+            content: {
+              'application/pdf': {
+                schema: { type: 'string', format: 'binary' },
+              },
+            },
+          },
+          '404': { description: 'Payment not found' },
+        },
+      },
+    },
+=======
     '/lessons': {
       get: {
         tags: ['Lessons'],
@@ -109,6 +176,74 @@ export const openApiSpec = {
           url: { type: 'string', format: 'uri' },
         },
         required: ['title'],
+      },
+      ForumThread: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+        required: ['id', 'title', 'createdAt'],
+      },
+      ForumThreadPage: {
+        type: 'object',
+        properties: {
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ForumThread' },
+          },
+          nextCursor: {
+            type: 'string',
+            nullable: true,
+            description:
+              'Cursor for the next page, or null when there are no more results.',
+          },
+          hasMore: { type: 'boolean' },
+        },
+        required: ['data', 'hasMore'],
+      },
+      Payment: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          subtotal: { type: 'number', format: 'double' },
+          taxRate: { type: 'number', format: 'double' },
+          taxAmount: { type: 'number', format: 'double' },
+          taxJurisdiction: { type: 'string' },
+          total: { type: 'number', format: 'double' },
+          currency: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+        required: [
+          'id',
+          'subtotal',
+          'taxRate',
+          'taxAmount',
+          'taxJurisdiction',
+          'total',
+        ],
+      },
+      Invoice: {
+        type: 'object',
+        properties: {
+          paymentId: { type: 'string' },
+          subtotal: { type: 'number', format: 'double' },
+          taxRate: { type: 'number', format: 'double' },
+          taxAmount: { type: 'number', format: 'double' },
+          taxJurisdiction: { type: 'string' },
+          total: { type: 'number', format: 'double' },
+          currency: { type: 'string' },
+          issuedAt: { type: 'string', format: 'date-time' },
+        },
+        required: [
+          'paymentId',
+          'subtotal',
+          'taxRate',
+          'taxAmount',
+          'taxJurisdiction',
+          'total',
+        ],
       },
     },
   },

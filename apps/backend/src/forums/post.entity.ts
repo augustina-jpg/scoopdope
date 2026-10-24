@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -11,6 +12,8 @@ import { Course } from '../courses/course.entity';
 import { User } from '../users/user.entity';
 import { Reply } from './reply.entity';
 
+// Why: supports keyset (cursor) pagination on forum threads ordered by (createdAt DESC, id DESC).
+@Index(['createdAt', 'id'])
 @Entity('posts')
 export class Post {
   @PrimaryGeneratedColumn('uuid')

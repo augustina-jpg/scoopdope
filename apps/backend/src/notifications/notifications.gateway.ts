@@ -49,15 +49,38 @@ export class NotificationsGateway
     this.redisClients = [];
   }
 
+  private extractToken(client: Socket): string | undefined {
+    const authToken = client.handshake.auth?.token as string | undefined;
+    if (authToken) return authToken;
+
+    const authHeader = client.handshake.headers?.authorization;
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      return authHeader.slice('Bearer '.length).trim();
+    }
+
+    const cookieHeader = client.handshake.headers?.cookie;
+    if (typeof cookieHeader === 'string') {
+      for (const part of cookieHeader.split(';')) {
+        const [name, ...rest] = part.trim().split('=');
+        if (name === 'access_token') {
+          return decodeURIComponent(rest.join('='));
+        }
+      }
+    }
+
+    return undefined;
+  }
+
   async handleConnection(client: Socket) {
-    const token = client.handshake.auth?.token as string | undefined;
+    const token = this.extractToken(client);
     if (!token) {
-      client.disconnect();
+      client.disconnect(true);
       return;
     }
     try {
       const payload = this.jwtService.verify<{ sub: string }>(token);
       const userId = payload.sub;
+      client.data.userId = userId;
       client.join(`user:${userId}`);
 
       // Send full initial notifications on connect
@@ -80,7 +103,7 @@ export class NotificationsGateway
 
       this.logger.debug(`Client connected: ${client.id}, user: ${userId}`);
     } catch {
-      client.disconnect();
+      client.disconnect(true);
     }
   }
 
@@ -88,18 +111,31 @@ export class NotificationsGateway
     this.logger.debug(`Client disconnected: ${client.id}`);
   }
 
+  @SubscribeMessage('notifications:joinRoom')
+  handleJoinRoom(client: Socket, room: string): void {
+    const userId = client.data?.userId as string | undefined;
+    if (!userId) {
+      client.disconnect(true);
+      return;
+    }
+    if (typeof room !== 'string' || !room.startsWith(`user:${userId}`)) {
+      this.logger.warn(
+        `Client ${client.id} (user ${userId}) attempted to join unauthorized room: ${room}`,
+      );
+      return;
+    }
+    client.join(room);
+  }
+
   @SubscribeMessage('notifications:markRead')
   async handleMarkRead(
     client: Socket,
     ids: string[],
   ): Promise<void> {
-    const token = client.handshake.auth?.token as string | undefined;
-    if (!token) return;
+    const userId = client.data?.userId as string | undefined;
+    if (!userId) return;
 
     try {
-      const payload = this.jwtService.verify<{ sub: string }>(token);
-      const userId = payload.sub;
-      
       // Update notifications in database
       await this.notificationRepo
         .createQueryBuilder()
