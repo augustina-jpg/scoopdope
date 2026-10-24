@@ -10,6 +10,7 @@ export enum NotificationType {
   ANNOUNCEMENT = 'announcement',
   WAITLIST_JOINED = 'waitlist_joined',
   WAITLIST_ENROLLED = 'waitlist_enrolled',
+  MODERATION_APPEAL = 'moderation_appeal',
   // #867: new types for the notification center
   CERTIFICATE = 'certificate',
   UPDATE = 'update',

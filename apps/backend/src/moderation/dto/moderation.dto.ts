@@ -1,6 +1,7 @@
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ContentType, ModerationStatus } from '../moderation.enums';
+import { AppealStatus, ContentType, ModerationStatus } from '../moderation.enums';
 
 export class FlagContentDto {
   @ApiProperty({ enum: ContentType })
@@ -32,6 +33,30 @@ export class AppealDto {
   @ApiProperty()
   @IsString()
   reason: string;
+}
+
+export class SubmitModerationAppealDto {
+  @ApiProperty()
+  @IsUUID()
+  moderationItemId: string;
+
+  @ApiProperty({ maxLength: 2000 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  reason: string;
+}
+
+export class ResolveModerationAppealDto {
+  @ApiProperty({ enum: [AppealStatus.ACCEPTED, AppealStatus.REJECTED] })
+  @IsEnum([AppealStatus.ACCEPTED, AppealStatus.REJECTED])
+  status: AppealStatus.ACCEPTED | AppealStatus.REJECTED;
+
+  @ApiPropertyOptional({ maxLength: 2000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  resolutionNote?: string;
 }
 
 export class ModerationQueueQueryDto {

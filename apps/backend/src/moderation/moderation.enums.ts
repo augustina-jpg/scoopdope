@@ -22,3 +22,9 @@ export enum ModerationAction {
   APPEAL_APPROVED = 'appeal_approved',
   APPEAL_REJECTED = 'appeal_rejected',
 }
+
+export enum AppealStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+}

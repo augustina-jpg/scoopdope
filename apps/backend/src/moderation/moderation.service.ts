@@ -15,7 +15,12 @@ import {
 } from '@aws-sdk/client-comprehend';
 import { ModerationItem } from './moderation-item.entity';
 import { ModerationLog } from './moderation-log.entity';
+import { ModerationAppeal } from './moderation-appeal.entity';
 import { ContentType, ModerationAction, ModerationStatus } from './moderation.enums';
+import { Course } from '../courses/course.entity';
+import { Review } from '../courses/review.entity';
+import { Post } from '../forums/post.entity';
+import { Reply } from '../forums/reply.entity';
 import {
   AppealDto,
   FlagContentDto,
@@ -36,6 +41,16 @@ export class ModerationService {
     private readonly itemRepo: Repository<ModerationItem>,
     @InjectRepository(ModerationLog)
     private readonly logRepo: Repository<ModerationLog>,
+    @InjectRepository(ModerationAppeal)
+    private readonly appealRepo: Repository<ModerationAppeal>,
+    @InjectRepository(Course)
+    private readonly courseRepo: Repository<Course>,
+    @InjectRepository(Post)
+    private readonly postRepo: Repository<Post>,
+    @InjectRepository(Reply)
+    private readonly replyRepo: Repository<Reply>,
+    @InjectRepository(Review)
+    private readonly reviewRepo: Repository<Review>,
     private readonly config: ConfigService
   ) {
     this.comprehend = new ComprehendClient({
@@ -78,6 +93,7 @@ export class ModerationService {
         contentType,
         contentId,
         reportedByUserId: userId,
+        contentOwnerUserId: userId,
         status: ModerationStatus.PENDING,
         flagReason: 'Auto-flagged by AWS Comprehend',
         toxicityScore,
@@ -92,11 +108,13 @@ export class ModerationService {
 
   /** Manually flag content */
   async flagContent(dto: FlagContentDto, userId: string): Promise<ModerationItem> {
+    const contentOwnerUserId = await this.getContentOwnerUserId(dto.contentType, dto.contentId);
     const existing = await this.itemRepo.findOne({
       where: { contentType: dto.contentType, contentId: dto.contentId, status: ModerationStatus.PENDING },
     });
 
     if (existing) {
+      existing.contentOwnerUserId ??= contentOwnerUserId;
       existing.flagCount += 1;
       if (!existing.isHidden && existing.flagCount >= this.AUTO_HIDE_THRESHOLD) {
         existing.isHidden = true;
@@ -112,6 +130,7 @@ export class ModerationService {
       contentType: dto.contentType,
       contentId: dto.contentId,
       reportedByUserId: userId,
+      contentOwnerUserId,
       status: ModerationStatus.PENDING,
       flagReason: dto.reason ?? null,
       flagCount: 1,
@@ -146,6 +165,9 @@ export class ModerationService {
     item.status = dto.status;
     item.reviewedByUserId = adminId;
     item.reviewNote = dto.note ?? null;
+    if (dto.status === ModerationStatus.REJECTED && !item.contentOwnerUserId) {
+      item.contentOwnerUserId = await this.getContentOwnerUserId(item.contentType, item.contentId);
+    }
     const saved = await this.itemRepo.save(item);
 
     const action =
@@ -160,7 +182,10 @@ export class ModerationService {
     if (item.status !== ModerationStatus.REJECTED) {
       throw new BadRequestException('Only rejected items can be appealed');
     }
-    if (item.appealedByUserId) {
+    if (
+      item.appealedByUserId ||
+      (await this.appealRepo.findOne({ where: { moderationItemId: id } }))
+    ) {
       throw new BadRequestException('Appeal already submitted');
     }
 
@@ -183,6 +208,9 @@ export class ModerationService {
     if (item.status !== ModerationStatus.APPEALED) {
       throw new BadRequestException('Item is not under appeal');
     }
+    if (await this.appealRepo.findOne({ where: { moderationItemId: id } })) {
+      throw new BadRequestException('Resolve this appeal through the moderation appeals endpoint');
+    }
 
     item.status = approve ? ModerationStatus.APPROVED : ModerationStatus.REJECTED;
     item.reviewedByUserId = adminId;
@@ -198,6 +226,32 @@ export class ModerationService {
     const item = await this.itemRepo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('Moderation item not found');
     return item;
+  }
+
+  async getContentOwnerUserId(
+    contentType: ContentType,
+    contentId: string
+  ): Promise<string | null> {
+    switch (contentType) {
+      case ContentType.COURSE: {
+        const course = await this.courseRepo.findOne({ where: { id: contentId } });
+        return course?.instructorId ?? null;
+      }
+      case ContentType.POST: {
+        const post = await this.postRepo.findOne({ where: { id: contentId } });
+        return post?.userId ?? null;
+      }
+      case ContentType.REPLY: {
+        const reply = await this.replyRepo.findOne({ where: { id: contentId } });
+        return reply?.userId ?? null;
+      }
+      case ContentType.REVIEW: {
+        const review = await this.reviewRepo.findOne({ where: { id: contentId } });
+        return review?.userId ?? null;
+      }
+      default:
+        return null;
+    }
   }
 
   async getLogs(moderationItemId: string): Promise<ModerationLog[]> {
