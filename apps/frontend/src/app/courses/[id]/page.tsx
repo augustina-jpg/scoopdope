@@ -1,6 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { ReviewList } from '@/components/reviews/ReviewList';
 import { QAPanel } from '@/components/courses/QAPanel';
@@ -8,12 +9,21 @@ import { AnnouncementsPanel } from '@/components/courses/AnnouncementsPanel';
 import { AssignmentsTab } from '@/components/assignments/AssignmentsTab';
 import { CourseForumTab } from '@/components/forum/CourseForumTab';
 import { WaitlistButton } from '@/components/courses/WaitlistButton';
+import { PrerequisitesPanel } from '@/components/courses/PrerequisitesPanel';
 import { ProgressTracker } from '@/components/courses/ProgressTracker';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompareStore } from '@/store/compare.store';
-import api from '@/lib/api';
-import { toast } from '@/lib/toast';
-import { PlayCircle, Lock, Calendar, CheckCircle, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
+import api, { unwrapApiResponse } from '@/lib/api';
+import { reviewsApi } from '@/lib/reviewsApi';
+import {
+  PlayCircle,
+  Lock,
+  Calendar,
+  CheckCircle,
+  CheckCircle2,
+  Circle,
+  AlertTriangle,
+} from 'lucide-react';
 
 interface CourseDetailPageProps {
   params: { id: string };
@@ -34,6 +44,13 @@ interface Lesson {
   durationMinutes: number;
 }
 
+interface LessonProgressRecord {
+  courseId: string;
+  lessonId: string;
+  progressPct: number;
+  completedAt: string | null;
+}
+
 interface CourseModule {
   id: string;
   title: string;
@@ -41,6 +58,8 @@ interface CourseModule {
   releaseDate?: string;
   lessons?: Lesson[];
 }
+
+interface Prerequisite {
   courseId: string;
   title: string;
   completed: boolean;
@@ -52,10 +71,17 @@ interface PrerequisiteStatus {
   prerequisites: Prerequisite[];
 }
 
-type ModuleProgressMap = Record<string, { completed: boolean; lessonProgress: Record<string, boolean> }>;
+type ModuleProgressMap = Record<
+  string,
+  { completed: boolean; lessonProgress: Record<string, boolean> }
+>;
 
 export default function CourseDetailPage({ params }: CourseDetailPageProps) {
-  const [tab, setTab] = useState<'overview' | 'curriculum' | 'reviews' | 'qa' | 'announcements' | 'assignments' | 'forum'>('overview');
+  const t = useTranslations('course');
+  const reviewT = useTranslations('reviews');
+  const [tab, setTab] = useState<
+    'overview' | 'curriculum' | 'reviews' | 'qa' | 'announcements' | 'assignments' | 'forum'
+  >('overview');
   const [reviewsKey, setReviewsKey] = useState(0);
   const [course, setCourse] = useState<CourseData | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -65,33 +91,40 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const [prereqStatus, setPrereqStatus] = useState<PrerequisiteStatus | null>(null);
   const [prereqLoading, setPrereqLoading] = useState(true);
   const [moduleProgress, setModuleProgress] = useState<ModuleProgressMap>({});
+  const [reviewSummary, setReviewSummary] = useState<{
+    averageRating: number | null;
+    total: number;
+  } | null>(null);
+  const [reviewSummaryError, setReviewSummaryError] = useState(false);
+  const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
+  const enrollmentErrorRef = useRef<HTMLParagraphElement>(null);
+  const enrollmentStatusRef = useRef<HTMLParagraphElement>(null);
   const { user } = useAuth();
   const { clear: clearCompare } = useCompareStore();
 
-  const hasUnmetPrereqs = prereqStatus !== null && !prereqStatus.allSatisfied && prereqStatus.prerequisites.length > 0;
+  const hasUnmetPrereqs =
+    prereqStatus !== null && !prereqStatus.allSatisfied && prereqStatus.prerequisites.length > 0;
 
   const courseId = params.id;
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
-
-  const handleEnroll = async () => {
-    setEnrolling(true);
-    try {
-      await api.post('/v1/enrollments', { courseId });
-      clearCompare();
-      toast.success('Enrolled successfully!');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Enrollment failed';
-      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? msg);
-    } finally {
-      setEnrolling(false);
-    }
-  };
+  const isFull =
+    course?.maxEnrollment != null && (course.enrollmentCount ?? 0) >= course.maxEnrollment;
 
   useEffect(() => {
+    async function fetchReviewSummary() {
+      try {
+        const response = await reviewsApi.getReviews(courseId, 'recent', 1, 1);
+        setReviewSummary({ averageRating: response.averageRating, total: response.total });
+        setReviewSummaryError(false);
+      } catch {
+        setReviewSummaryError(true);
+      }
+    }
+
     async function fetchCourse() {
       try {
         const { data } = await api.get(`/courses/${courseId}`);
-        setCourse(data);
+        setCourse(unwrapApiResponse<CourseData>(data));
       } catch {
         // course data unavailable
       }
@@ -101,8 +134,9 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       if (!user) return;
       try {
         const { data } = await api.get(`/users/${user.id}/enrollments`);
-        const enrolled = Array.isArray(data)
-          ? data.some((e: { courseId: string }) => e.courseId === courseId)
+        const enrollmentRecords = unwrapApiResponse<Array<{ courseId: string }>>(data);
+        const enrolled = Array.isArray(enrollmentRecords)
+          ? enrollmentRecords.some((e) => e.courseId === courseId)
           : false;
         setIsEnrolled(enrolled);
       } catch {
@@ -112,11 +146,12 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
 
     const fetchModules = async () => {
       try {
-        const { data } = await api.get(`/courses/${courseId}/modules`);
+        const { data: responseData } = await api.get(`/courses/${courseId}/modules`);
+        const data = unwrapApiResponse<CourseModule[]>(responseData);
         const modulesWithLessons = await Promise.all(
           data.map(async (mod: CourseModule) => {
             const lessonsRes = await api.get(`/modules/${mod.id}/lessons`);
-            return { ...mod, lessons: lessonsRes.data };
+            return { ...mod, lessons: unwrapApiResponse<Lesson[]>(lessonsRes.data) };
           })
         );
         setModules(modulesWithLessons);
@@ -128,10 +163,13 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
     };
 
     async function fetchPrerequisites() {
-      if (!user) { setPrereqLoading(false); return; }
+      if (!user) {
+        setPrereqLoading(false);
+        return;
+      }
       try {
         const { data } = await api.get(`/v1/courses/${courseId}/prerequisites/status`);
-        setPrereqStatus(data.data ?? data);
+        setPrereqStatus(unwrapApiResponse<PrerequisiteStatus>(data));
       } catch {
         setPrereqStatus(null);
       } finally {
@@ -142,15 +180,14 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
     async function fetchProgress(currentModules: CourseModule[]) {
       if (!user) return;
       try {
-        const { data } = await api.get<Array<{ courseId: string; lessonId: string; progressPct: number; completedAt: string | null }>>(`/users/${user.id}/progress`);
+        const { data: responseData } = await api.get(`/users/${user.id}/progress`);
+        const data = unwrapApiResponse<LessonProgressRecord[]>(responseData);
         // Filter progress for this course only
-        const courseProgress = (data ?? []).filter((p: any) => p.courseId === courseId);
+        const courseProgress = (data ?? []).filter((p) => p.courseId === courseId);
 
         // Track which lessons are completed
         const completedLessons = new Set(
-          courseProgress
-            .filter((p: any) => p.progressPct >= 100)
-            .map((p: any) => p.lessonId)
+          courseProgress.filter((p) => p.progressPct >= 100).map((p) => p.lessonId)
         );
 
         // Build progress map per module from the passed-in module data
@@ -178,20 +215,30 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
     }
 
     fetchCourse();
+    fetchReviewSummary();
     fetchEnrollmentStatus();
     fetchModules();
     fetchPrerequisites();
   }, [courseId, user]);
 
+  useEffect(() => {
+    if (enrollError) enrollmentErrorRef.current?.focus();
+    else if (enrollmentSuccess) enrollmentStatusRef.current?.focus();
+  }, [enrollError, enrollmentSuccess]);
+
   async function handleEnroll() {
     setEnrolling(true);
     setEnrollError(null);
+    setEnrollmentSuccess(false);
     try {
       await api.post(`/courses/${courseId}/enroll`);
       setIsEnrolled(true);
+      clearCompare();
+      setEnrollmentSuccess(true);
     } catch (err: unknown) {
       const msg: string =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Enrollment failed. Please try again.';
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        t('enrollmentFailed');
       setEnrollError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setEnrolling(false);
@@ -201,17 +248,21 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   return (
     <main className="max-w-4xl mx-auto p-8">
       <Link href="/courses" className="text-blue-600 hover:underline text-sm mb-4 inline-block">
-        ← Back to Courses
+        ← {t('backToCourses')}
       </Link>
       <div className="flex items-start justify-between gap-4 mb-2">
-        <h1 className="text-3xl font-bold">{course?.title ?? `Course ${courseId}`}</h1>
+        <h1 className="text-3xl font-bold">
+          {course?.title ?? t('courseFallback', { id: courseId })}
+        </h1>
 
         {/* Enrollment / Waitlist actions */}
         {user && !isInstructor && (
           <div className="shrink-0 w-48 space-y-2">
             {isEnrolled ? (
               <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-2 text-center">
-                <p className="text-sm font-medium text-green-700 dark:text-green-300">Enrolled ✓</p>
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                  {t('enrolled')}
+                </p>
               </div>
             ) : isFull ? (
               <WaitlistButton
@@ -227,19 +278,25 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                     onClick={handleEnroll}
                     disabled={enrolling || hasUnmetPrereqs}
                     className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Enroll in this course"
+                    aria-label={t('enrollButton')}
                   >
-                    {enrolling ? 'Enrolling…' : 'Enroll Now'}
+                    {enrolling ? t('enrolling') : t('enrollNow')}
                   </button>
                   {hasUnmetPrereqs && (
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-xs px-3 py-2 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10 text-center">
-                      Complete all prerequisites before enrolling
+                      {t('completePrerequisites')}
                       <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
                     </div>
                   )}
                 </div>
                 {enrollError && (
-                  <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                  <p
+                    ref={enrollmentErrorRef}
+                    tabIndex={-1}
+                    className="text-xs text-red-600 dark:text-red-400 focus:outline-none"
+                    role="alert"
+                    aria-live="assertive"
+                  >
                     {enrollError}
                   </p>
                 )}
@@ -247,7 +304,9 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                   <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 space-y-2">
                     <div className="flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Prerequisites required</span>
+                      <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                        {t('prerequisitesRequired')}
+                      </span>
                     </div>
                     <ul className="space-y-1">
                       {prereqStatus!.prerequisites.map((p) => (
@@ -260,7 +319,10 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                           {p.completed ? (
                             <span className="line-through text-gray-400 truncate">{p.title}</span>
                           ) : (
-                            <Link href={`/courses/${p.courseId}`} className="text-blue-600 hover:underline truncate">
+                            <Link
+                              href={`/courses/${p.courseId}`}
+                              className="text-blue-600 hover:underline truncate"
+                            >
                               {p.title} →
                             </Link>
                           )}
@@ -275,70 +337,115 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         )}
       </div>
 
+      {reviewSummary && (
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          {reviewSummary.averageRating === null
+            ? reviewT('noReviews')
+            : `${reviewSummary.averageRating.toFixed(1)} ★ · ${reviewT('reviewCount', { count: reviewSummary.total })}`}
+        </p>
+      )}
+      {reviewSummaryError && (
+        <p className="mb-4 text-sm text-gray-500" role="status">
+          {reviewT('summaryUnavailable')}
+        </p>
+      )}
+      {enrollmentSuccess && (
+        <p
+          ref={enrollmentStatusRef}
+          tabIndex={-1}
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+        >
+          {t('enrollmentSuccess')}
+        </p>
+      )}
       {course?.description && (
         <p className="text-gray-600 dark:text-gray-400 mb-2">{course.description}</p>
       )}
 
       {course?.maxEnrollment != null && (
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-          {course.enrollmentCount ?? 0} / {course.maxEnrollment} spots filled
+          {t('enrollmentSpots', {
+            enrolled: course.enrollmentCount ?? 0,
+            maximum: course.maxEnrollment,
+          })}
           {isFull && (
             <span className="ml-2 inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
-              Full
+              {t('full')}
             </span>
           )}
         </p>
       )}
 
-      <Link href={`/courses/${courseId}/forum`} className="text-blue-600 hover:underline text-sm mb-6 inline-block">
-        View Discussion Forum →
+      <Link
+        href={`/courses/${courseId}/forum`}
+        className="text-blue-600 hover:underline text-sm mb-6 inline-block"
+      >
+        {t('discussionForum')} →
       </Link>
 
       <div className="flex gap-4 border-b mb-6 overflow-x-auto">
-        {(['overview', 'curriculum', 'reviews', 'qa', 'announcements', 'assignments', 'forum'] as const).map((t) => (
+        {(
+          [
+            'overview',
+            'curriculum',
+            'reviews',
+            'qa',
+            'announcements',
+            'assignments',
+            'forum',
+          ] as const
+        ).map((tabName) => (
           <button
-            key={t}
+            key={tabName}
             className={`pb-2 px-1 capitalize text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              tab === tabName
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-            onClick={() => setTab(t)}
+            onClick={() => setTab(tabName)}
           >
-            {t === 'qa' ? 'Q&A' : t}
+            {reviewT(`tabs.${tabName}`)}
           </button>
         ))}
       </div>
 
       {tab === 'overview' && (
         <div className="space-y-4">
-          <p className="text-gray-600">Course content and details would appear here.</p>
+          <p className="text-gray-600">{t('courseContentPlaceholder')}</p>
           {!isInstructor && <PrerequisitesPanel courseId={courseId} />}
-          {!isInstructor && (
+          {!isInstructor && !isEnrolled && !isFull && (
             <div className="relative group inline-block">
               <button
                 onClick={handleEnroll}
                 disabled={enrolling || hasUnmetPrereqs}
                 className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 font-medium text-sm transition-colors"
               >
-                {enrolling ? 'Enrolling…' : 'Enroll Now'}
+                {enrolling ? t('enrolling') : t('enrollNow')}
               </button>
               {hasUnmetPrereqs && (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-xs px-3 py-2 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10 text-center">
-                  Complete all prerequisites before enrolling
+                  {t('completePrerequisites')}
                   <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
                 </div>
               )}
             </div>
           )}
-          <ReviewForm courseId={courseId} onSuccess={() => { setTab('reviews'); setReviewsKey((k) => k + 1); }} />
+          <ReviewForm
+            courseId={courseId}
+            onSuccess={() => {
+              setTab('reviews');
+              setReviewsKey((k) => k + 1);
+            }}
+          />
         </div>
       )}
 
       {tab === 'curriculum' && (
         <div className="space-y-6">
           {/* Progress tracker — shown above the module list for enrolled students */}
-          {user && !isInstructor && (
-            <ProgressTracker courseId={courseId} />
-          )}
+          {user && !isInstructor && <ProgressTracker courseId={courseId} />}
           {modules.map((mod) => {
             const modProgress = moduleProgress[mod.id];
             const isModuleCompleted = modProgress?.completed ?? false;
@@ -350,12 +457,12 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                   {user && !mod.isLocked && (
                     <span
                       aria-hidden={!isModuleCompleted}
-                      title={isModuleCompleted ? 'Completed' : undefined}
+                      title={isModuleCompleted ? t('completed') : undefined}
                     >
                       {isModuleCompleted ? (
                         <CheckCircle2
                           className="w-5 h-5 text-green-500 shrink-0"
-                          aria-label="Completed"
+                          aria-label={t('completed')}
                         />
                       ) : (
                         <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600 shrink-0" />
@@ -373,23 +480,38 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                     <span className="flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full">
                       <Lock className="w-3 h-3" />
                       {mod.releaseDate
-                        ? `Unlocks ${new Date(mod.releaseDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
-                        : 'Locked'}
+                        ? t('unlocksDate', {
+                            date: new Date(mod.releaseDate).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            }),
+                          })
+                        : t('locked')}
                     </span>
                   ) : mod.releaseDate ? (
                     <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">
                       <Calendar className="w-3 h-3" />
-                      Released {new Date(mod.releaseDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {t('releasedDate', {
+                        date: new Date(mod.releaseDate).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        }),
+                      })}
                     </span>
                   ) : null}
                 </div>
                 {mod.isLocked ? (
                   <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
                     <Lock className="w-4 h-4 shrink-0" />
-                    This module will be available on{' '}
+                    {t('moduleAvailableOn')}{' '}
                     {mod.releaseDate
-                      ? new Date(mod.releaseDate).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })
-                      : 'a future date'}
+                      ? new Date(mod.releaseDate).toLocaleString(undefined, {
+                          dateStyle: 'long',
+                          timeStyle: 'short',
+                        })
+                      : t('futureDate')}
                     .
                   </div>
                 ) : (
@@ -410,7 +532,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                             {isLessonCompleted ? (
                               <CheckCircle2
                                 className="w-5 h-5 text-green-500 shrink-0"
-                                aria-label="Completed"
+                                aria-label={t('completed')}
                               />
                             ) : (
                               <PlayCircle className="w-5 h-5 text-blue-500 shrink-0" />
@@ -425,7 +547,9 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                               {lesson.title}
                             </span>
                           </div>
-                          <span className="text-sm text-gray-500">{lesson.durationMinutes} min</span>
+                          <span className="text-sm text-gray-500">
+                            {t('lessonMinutes', { count: lesson.durationMinutes })}
+                          </span>
                         </Link>
                       );
                     })}
@@ -437,29 +561,19 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         </div>
       )}
 
-      {tab === 'reviews' && (
-        <ReviewList key={reviewsKey} courseId={courseId} />
-      )}
+      {tab === 'reviews' && <ReviewList key={reviewsKey} courseId={courseId} />}
 
       {tab === 'qa' && (
-        <QAPanel
-          courseId={courseId}
-          isInstructor={isInstructor}
-          currentUserId={user?.id}
-        />
+        <QAPanel courseId={courseId} isInstructor={isInstructor} currentUserId={user?.id} />
       )}
 
       {tab === 'announcements' && (
         <AnnouncementsPanel courseId={courseId} isInstructor={isInstructor} />
       )}
 
-      {tab === 'assignments' && (
-        <AssignmentsTab courseId={courseId} />
-      )}
+      {tab === 'assignments' && <AssignmentsTab courseId={courseId} />}
 
-      {tab === 'forum' && (
-        <CourseForumTab courseId={courseId} />
-      )}
+      {tab === 'forum' && <CourseForumTab courseId={courseId} />}
     </main>
   );
 }

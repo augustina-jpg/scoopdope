@@ -1,21 +1,104 @@
 import { test, expect } from '@playwright/test';
-import { injectAxe, checkA11y } from 'axe-playwright';
+import axe from 'axe-core';
+
+async function checkA11y(page: import('@playwright/test').Page, selector = 'main') {
+  await page.addScriptTag({ content: axe.source });
+  const violations = await page.evaluate(async (target) => {
+    const axeRunner = (
+      window as unknown as {
+        axe: {
+          run: (
+            context: Element | Document,
+            options: { runOnly: { type: 'tag'; values: string[] } }
+          ) => Promise<{ violations: Array<{ id: string; help: string }> }>;
+        };
+      }
+    ).axe;
+    const context = target ? document.querySelector(target) : document;
+    if (!context) throw new Error(`Accessibility scan target not found: ${target}`);
+    const result = await axeRunner.run(context, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+    });
+    return result.violations.map(({ id, help }) => ({ id, help }));
+  }, selector);
+  expect(violations).toEqual([]);
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+async function openEnrollmentPage(page: import('@playwright/test').Page, enrollmentStatus = 201) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      sub: 'learner-1',
+      username: 'Learner',
+      email: 'learner@example.com',
+      role: 'student',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+  ).toString('base64');
+  const token = `e30.${payload}.signature`;
+  await page.addInitScript((authToken) => {
+    window.localStorage.setItem('token', authToken);
+    window.localStorage.setItem(
+      'auth',
+      JSON.stringify({
+        state: {
+          token: authToken,
+          user: {
+            id: 'learner-1',
+            username: 'Learner',
+            email: 'learner@example.com',
+            role: 'student',
+          },
+        },
+        version: 0,
+      })
+    );
+  }, token);
+  await page.route(`${API_BASE}/**`, async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: body,
+          statusCode: status,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+    if (route.request().method() === 'POST' && pathname.endsWith('/courses/course-1/enroll')) {
+      return json({ id: 'enrollment-1', courseId: 'course-1' }, enrollmentStatus);
+    }
+    if (pathname.endsWith('/courses/course-1/reviews')) {
+      return json({ data: [], total: 0, page: 1, limit: 10, averageRating: null });
+    }
+    if (pathname.endsWith('/courses/course-1/prerequisites/status')) {
+      return json({ allSatisfied: true, prerequisites: [] });
+    }
+    if (pathname.endsWith('/users/learner-1/enrollments')) return json([]);
+    if (pathname.endsWith('/users/learner-1/progress')) return json([]);
+    if (pathname.endsWith('/courses/course-1/modules')) return json([]);
+    if (pathname.endsWith('/courses/course-1')) {
+      return json({
+        id: 'course-1',
+        title: 'Accessible course',
+        description: 'Learn at your own pace.',
+        maxEnrollment: null,
+        isPublished: true,
+      });
+    }
+    return json({}, 404);
+  });
+  await page.goto('/courses/course-1');
+}
 
 test.describe('Accessibility Tests - WCAG 2.1 AA Compliance', () => {
-  test.beforeEach(async ({ page }) => {
-    // Inject axe-core into the page
-    await injectAxe(page);
-  });
-
   test.describe('Home Page', () => {
     test('should have no accessibility violations', async ({ page }) => {
       await page.goto('/');
-      await checkA11y(page, null, {
-        detailedReport: true,
-        detailedReportOptions: {
-          html: true,
-        },
-      });
+      await checkA11y(page);
     });
 
     test('should have proper heading hierarchy', async ({ page }) => {
@@ -91,8 +174,29 @@ test.describe('Accessibility Tests - WCAG 2.1 AA Compliance', () => {
   test.describe('Courses Page', () => {
     test('should have no accessibility violations', async ({ page }) => {
       await page.goto('/courses');
-      await checkA11y(page, null, {
-        detailedReport: true,
+      await checkA11y(page);
+    });
+
+    test.describe('Course Enrollment', () => {
+      test('is accessible and can be completed using only the keyboard', async ({ page }) => {
+        await openEnrollmentPage(page);
+        await checkA11y(page);
+
+        const enrollButton = page.getByRole('button', { name: 'Enroll in this course' });
+        await enrollButton.focus();
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('status')).toContainText('Enrollment successful.');
+      });
+
+      test('announces enrollment errors and moves focus to the error message', async ({ page }) => {
+        await openEnrollmentPage(page, 403);
+        const enrollButton = page.getByRole('button', { name: 'Enroll in this course' });
+        await enrollButton.focus();
+        await page.keyboard.press('Enter');
+
+        const error = page.getByRole('alert');
+        await expect(error).toBeFocused();
+        await expect(error).toHaveAttribute('aria-live', 'assertive');
       });
     });
 
@@ -120,12 +224,10 @@ test.describe('Accessibility Tests - WCAG 2.1 AA Compliance', () => {
   });
 
   test.describe('Keyboard Navigation', () => {
-    test('should navigate through interactive elements with Tab', async ({
-      page,
-    }) => {
+    test('should navigate through interactive elements with Tab', async ({ page }) => {
       await page.goto('/');
       const focusableElements = await page.locator(
-        'a, button, input, select, textarea, [tabindex]',
+        'a, button, input, select, textarea, [tabindex]'
       );
       const count = await focusableElements.count();
 

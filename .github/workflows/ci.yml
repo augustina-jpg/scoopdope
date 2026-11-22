@@ -220,6 +220,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -240,6 +242,13 @@ jobs:
 
       - name: Lint frontend
         run: npm run lint --workspace=apps/frontend
+
+      - name: Check frontend translations
+        run: |
+          npm run test:i18n --workspace=apps/frontend
+          npm run check:i18n --workspace=apps/frontend -- --base "$I18N_BASE_SHA"
+        env:
+          I18N_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
       - name: Build frontend
         run: npm run build --workspace=apps/frontend

@@ -10,6 +10,14 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+export function unwrapApiResponse<T>(response: unknown): T {
+  let value = response;
+  while (value && typeof value === 'object' && 'data' in value) {
+    value = (value as { data: unknown }).data;
+  }
+  return value as T;
+}
+
 api.interceptors.request.use((config) => {
   if (typeof window === 'undefined') return config;
   const token = useAuthStore.getState().token;
@@ -33,7 +41,7 @@ api.interceptors.response.use(
     if (deprecated) {
       console.warn(
         `API version ${apiVersion} is deprecated. Sunset: ${sunset || 'soon'}. ` +
-        `Please migrate to a supported version: ${SUPPORTED_API_VERSIONS.join(', ')}`
+          `Please migrate to a supported version: ${SUPPORTED_API_VERSIONS.join(', ')}`
       );
     }
 
