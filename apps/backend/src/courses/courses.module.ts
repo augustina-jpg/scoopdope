@@ -29,12 +29,14 @@ import { TranscribeService } from './transcribe.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { User } from '../users/user.entity';
+import { Progress } from '../progress/progress.entity';
 import { CourseInstructor } from './course-instructor.entity';
 import { InstructorAssignmentService } from './instructor-assignment.service';
 import { InstructorAssignmentController } from './instructor-assignment.controller';
 import { CourseImportService } from './course-import.service';
 import { CourseImportController } from './course-import.controller';
 import { AuditModule } from '../audit/audit.module';
+import { AnnouncementsModule } from '../announcements/announcements.module';
 
 @Module({
   imports: [
@@ -42,8 +44,10 @@ import { AuditModule } from '../audit/audit.module';
       Course,
       CourseModule,
       Lesson,
+      Category,
       Review,
       Enrollment,
+      Progress,
       CourseVersion,
       CoursePrerequisite,
       User,
@@ -59,6 +63,7 @@ import { AuditModule } from '../audit/audit.module';
     CoursesService,
     ModulesService,
     LessonsService,
+    CategoriesService,
     ReviewsService,
     CourseVersioningService,
     PrerequisitesService,
@@ -70,7 +75,9 @@ import { AuditModule } from '../audit/audit.module';
   ],
   controllers: [
     CoursesController,
+    AdminCoursesController,
     ModulesController,
+    CategoriesController,
     ReviewsController,
     CourseVersioningController,
     PrerequisitesController,

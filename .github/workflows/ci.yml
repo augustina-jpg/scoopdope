@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,6 +27,13 @@ jobs:
 
       - name: Run lint
         run: npm run lint --if-present
+
+      - name: Check frontend translations
+        run: |
+          npm run test:i18n --workspace=apps/frontend
+          npm run check:i18n --workspace=apps/frontend -- --base "$I18N_BASE_SHA"
+        env:
+          I18N_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
   test:
     name: Test
@@ -95,7 +104,6 @@ jobs:
           fi
           echo "pdffonts output for $SAMPLE:"
           pdffonts "$SAMPLE" | tee /tmp/pdffonts.txt
-          # Skip the two header lines, then verify every font row has 'yes' in the Emb column.
           FONT_ROWS=$(tail -n +3 /tmp/pdffonts.txt | sed '/^\s*$/d')
           if [ -z "$FONT_ROWS" ]; then
             echo "No fonts found in generated certificate"

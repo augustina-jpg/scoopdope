@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { CheckCircle, Circle, AlertTriangle } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function PrerequisitesPanel({ courseId }: Props) {
+  const t = useTranslations('course');
   const [status, setStatus] = useState<PrerequisiteStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +34,7 @@ export function PrerequisitesPanel({ courseId }: Props) {
       .finally(() => setLoading(false));
   }, [courseId]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading prerequisites…</p>;
+  if (loading) return <p className="text-sm text-gray-500">{t('prerequisitesLoading')}</p>;
   if (!status || !status.prerequisites.length) return null;
 
   return (
@@ -44,9 +46,7 @@ export function PrerequisitesPanel({ courseId }: Props) {
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
         )}
         <h3 className="font-semibold text-sm">
-          {status.allSatisfied
-            ? 'All prerequisites completed'
-            : 'Complete these courses before enrolling'}
+          {status.allSatisfied ? t('prerequisitesCompleted') : t('prerequisitesIncomplete')}
         </h3>
       </div>
 
@@ -61,7 +61,9 @@ export function PrerequisitesPanel({ courseId }: Props) {
               )}
               <span
                 className={`text-sm truncate ${
-                  prereq.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'
+                  prereq.completed
+                    ? 'line-through text-gray-400'
+                    : 'text-gray-800 dark:text-gray-200'
                 }`}
               >
                 {prereq.title}
@@ -72,7 +74,7 @@ export function PrerequisitesPanel({ courseId }: Props) {
                 href={`/courses/${prereq.courseId}`}
                 className="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap"
               >
-                {prereq.enrolled ? 'Continue →' : 'View course →'}
+                {prereq.enrolled ? t('continueCourse') : t('viewCourse')}
               </Link>
             )}
           </li>

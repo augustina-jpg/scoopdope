@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -56,10 +66,7 @@ export class ReviewsController {
   @ApiResponse({ status: 429, description: 'Too many requests' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   @ApiResponse({ status: 200, description: 'Review flagged successfully' })
-  flag(
-    @Param('id') courseId: string,
-    @Param('reviewId') reviewId: string,
-  ) {
+  flag(@Param('id') courseId: string, @Param('reviewId') reviewId: string) {
     return this.reviewsService.flagReview(courseId, reviewId);
   }
 
@@ -81,12 +88,14 @@ export class ReviewsController {
     name: 'limit',
     required: false,
     type: Number,
-    description: 'Results per page (default: 20)',
+    description: 'Results per page (default: 10)',
   })
   @ApiResponse({
     status: 200,
     description: 'Returns paginated course reviews',
-    schema: { example: { data: [], total: 0, page: 1, limit: 20 } },
+    schema: {
+      example: { data: [], total: 0, page: 1, limit: 10, averageRating: null },
+    },
   })
   findByCourse(@Param('id') courseId: string, @Query() query: ReviewQueryDto) {
     return this.reviewsService.findByCourse(courseId, query);
