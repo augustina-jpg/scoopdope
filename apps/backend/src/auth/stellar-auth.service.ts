@@ -1,13 +1,15 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Keypair, Networks, WebAuth } from '@stellar/stellar-sdk';
 import { UsersService } from '../users/users.service';
+import { redactErrorMessage } from '../common/utils/log-redactor';
 
 const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
 
 @Injectable()
 export class StellarAuthService {
+  private readonly logger = new Logger(StellarAuthService.name);
   private readonly serverKeypair: Keypair;
   private readonly networkPassphrase: string;
   private readonly webAuthDomain: string;
@@ -23,6 +25,14 @@ export class StellarAuthService {
     const isTestnet = this.configService.get<string>('stellar.network') !== 'mainnet';
     this.networkPassphrase = isTestnet ? Networks.TESTNET : Networks.PUBLIC;
     this.webAuthDomain = this.configService.get<string>('stellar.webAuthDomain') ?? '';
+
+    // Never log the keypair object or its secret(): it would expose
+    // STELLAR_SECRET_KEY to every log sink. Only the public key is safe.
+    this.logger.log(
+      `Stellar auth initialized (publicKey=${this.serverKeypair.publicKey()}, network=${
+        isTestnet ? 'testnet' : 'mainnet'
+      })`
+    );
   }
 
   /** GET /auth/stellar?account=G... — returns a SEP-0010 challenge XDR */
@@ -51,7 +61,11 @@ export class StellarAuthService {
       );
       clientPublicKey = clientAccountID;
     } catch (err) {
-      throw new UnauthorizedException(`Invalid SEP-0010 challenge: ${err.message}`);
+      // The XDR decoder echoes the offending envelope, which can contain the
+      // signing keypair — scrub before it reaches the client or a log sink.
+      throw new UnauthorizedException(
+        `Invalid SEP-0010 challenge: ${redactErrorMessage(err)}`
+      );
     }
 
     // Find or auto-provision a user for this Stellar account

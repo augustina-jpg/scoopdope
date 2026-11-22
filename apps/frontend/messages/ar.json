@@ -167,7 +167,12 @@
     "releasedDate": "نُشر في {date}",
     "moduleAvailableOn": "ستكون هذه الوحدة متاحة في",
     "futureDate": "تاريخ لاحق",
-    "lessonMinutes": "{count, plural, one {# دقيقة} other {# دقائق}}"
+    "lessonMinutes": "{count, plural, one {# دقيقة} other {# دقائق}}",
+    "noLessonsYet": "لا توجد دروس بعد",
+    "addFirstLesson": "أضف درسك الأول لبدء إنشاء هذه الدورة.",
+    "lessonsComingSoon": "دروس هذه الدورة قادمة قريبًا. تحقق مرة أخرى لاحقًا.",
+    "addLesson": "إضافة درس",
+    "browseOtherCourses": "تصفح دورات أخرى"
   },
   "reviews": {
     "courseReviews": "مراجعات الدورة",

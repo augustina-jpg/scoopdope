@@ -87,6 +87,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [prereqStatus, setPrereqStatus] = useState<PrerequisiteStatus | null>(null);
   const [prereqLoading, setPrereqLoading] = useState(true);
@@ -159,6 +160,8 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         if (user) await fetchProgress(modulesWithLessons);
       } catch (error) {
         console.error('Failed to fetch course curriculum:', error);
+      } finally {
+        setModulesLoading(false);
       }
     };
 
@@ -385,6 +388,13 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         {t('discussionForum')} →
       </Link>
 
+      {/* Progress tracker — shown prominently above the tabs for enrolled students */}
+      {user && !isInstructor && isEnrolled && (
+        <div className="mb-6">
+          <ProgressTracker courseId={courseId} />
+        </div>
+      )}
+
       <div className="flex gap-4 border-b mb-6 overflow-x-auto">
         {(
           [
@@ -446,6 +456,21 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         <div className="space-y-6">
           {/* Progress tracker — shown above the module list for enrolled students */}
           {user && !isInstructor && <ProgressTracker courseId={courseId} />}
+          {!modulesLoading && modules.every((m) => !m.lessons?.length) && (
+            <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center">
+              <PlayCircle className="mx-auto mb-3 h-10 w-10 text-gray-400" aria-hidden="true" />
+              <h2 className="text-lg font-semibold">{t('noLessonsYet')}</h2>
+              <p className="mt-1 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                {isInstructor ? t('addFirstLesson') : t('lessonsComingSoon')}
+              </p>
+              <Link
+                href={isInstructor ? '/instructor/dashboard' : '/courses'}
+                className="inline-block rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium"
+              >
+                {isInstructor ? t('addLesson') : t('browseOtherCourses')}
+              </Link>
+            </div>
+          )}
           {modules.map((mod) => {
             const modProgress = moduleProgress[mod.id];
             const isModuleCompleted = modProgress?.completed ?? false;

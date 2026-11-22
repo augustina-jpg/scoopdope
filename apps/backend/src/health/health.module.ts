@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { HttpModule } from '@nestjs/axios';
+import { DatabaseModule } from '../database/database.module';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import {
   DiskHealthIndicator,
   ElasticsearchHealthIndicator,
-  StellarSorobanHealthIndicator,
+  StellarHealthIndicator,
 } from './indicators';
 
 @Module({
@@ -16,13 +17,14 @@ import {
       gracefulShutdownTimeoutMs: 1000,
     }),
     HttpModule,
+    DatabaseModule,
   ],
   controllers: [HealthController],
   providers: [
     HealthService,
     DiskHealthIndicator,
     ElasticsearchHealthIndicator,
-    StellarSorobanHealthIndicator,
+    StellarHealthIndicator,
   ],
   exports: [HealthService],
 })

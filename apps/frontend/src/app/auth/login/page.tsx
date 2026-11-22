@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { useThemeStore } from '@/store/theme.store';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
@@ -64,6 +65,9 @@ export default function LoginPage() {
         localStorage.setItem('access_token', res.data.access_token);
         const profileResponse = await api.get('/users/me');
         login(res.data.access_token, profileResponse.data);
+        if (profileResponse.data.themePreference) {
+          useThemeStore.getState().syncTheme(profileResponse.data.themePreference);
+        }
         setIsLoading(false);
         router.push('/dashboard');
         return;
@@ -86,6 +90,9 @@ export default function LoginPage() {
       localStorage.setItem('access_token', res.data.access_token);
       const profileResponse = await api.get('/users/me');
       login(res.data.access_token, profileResponse.data);
+      if (profileResponse.data.themePreference) {
+        useThemeStore.getState().syncTheme(profileResponse.data.themePreference);
+      }
       setIsLoading(false);
       router.push('/dashboard');
     } catch (err: any) {

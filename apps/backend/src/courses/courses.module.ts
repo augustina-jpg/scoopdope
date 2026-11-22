@@ -3,11 +3,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Course } from './course.entity';
 import { CourseModule } from './course-module.entity';
 import { Lesson } from './lesson.entity';
+import { Category } from './category.entity';
 import { CoursesService } from './courses.service';
 import { ModulesService } from './modules.service';
 import { LessonsService } from './lessons.service';
+import { CategoriesService } from './categories.service';
 import { CoursesController } from './courses.controller';
+import { AdminCoursesController } from './admin-courses.controller';
 import { ModulesController } from './modules.controller';
+import { CategoriesController } from './categories.controller';
 import { Review } from './review.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { ReviewsService } from './reviews.service';
@@ -26,6 +30,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { User } from '../users/user.entity';
 import { Progress } from '../progress/progress.entity';
+import { CourseInstructor } from './course-instructor.entity';
+import { InstructorAssignmentService } from './instructor-assignment.service';
+import { InstructorAssignmentController } from './instructor-assignment.controller';
+import { CourseImportService } from './course-import.service';
+import { CourseImportController } from './course-import.controller';
+import { AuditModule } from '../audit/audit.module';
+import { AnnouncementsModule } from '../announcements/announcements.module';
 
 @Module({
   imports: [
@@ -33,34 +44,45 @@ import { Progress } from '../progress/progress.entity';
       Course,
       CourseModule,
       Lesson,
+      Category,
       Review,
       Enrollment,
       Progress,
       CourseVersion,
       CoursePrerequisite,
       User,
+      CourseInstructor,
     ]),
     SearchModule,
     NotificationsModule,
     MetricsModule,
+    AnnouncementsModule,
+    AuditModule,
   ],
   providers: [
     CoursesService,
     ModulesService,
     LessonsService,
+    CategoriesService,
     ReviewsService,
     CourseVersioningService,
     PrerequisitesService,
     CourseSchedulerService,
     DripSchedulerService,
     TranscribeService,
+    InstructorAssignmentService,
+    CourseImportService,
   ],
   controllers: [
     CoursesController,
+    AdminCoursesController,
     ModulesController,
+    CategoriesController,
     ReviewsController,
     CourseVersioningController,
     PrerequisitesController,
+    InstructorAssignmentController,
+    CourseImportController,
   ],
   exports: [CoursesService, PrerequisitesService],
 })

@@ -17,6 +17,7 @@ replicas:
 
 patchesStrategicMerge:
   - deployment-patch.yaml
+  - hpa-patch.yaml
 
 configMapGenerator:
   - name: scoopdope-backend-config

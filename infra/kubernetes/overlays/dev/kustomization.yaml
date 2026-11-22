@@ -18,6 +18,18 @@ replicas:
 patchesStrategicMerge:
   - deployment-patch.yaml
 
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: scoopdope-backend-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
 configMapGenerator:
   - name: scoopdope-backend-config
     behavior: merge

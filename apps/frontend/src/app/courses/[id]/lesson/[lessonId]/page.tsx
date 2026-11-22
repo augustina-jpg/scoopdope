@@ -21,7 +21,10 @@ export default function LessonPage() {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [sidebarTab, setSidebarTab] = useState<'transcript' | 'notes' | 'progress'>('transcript');
+  const [isCompleting, setIsCompleting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { recordProgress } = useSyncProgress();
 
@@ -33,6 +36,89 @@ export default function LessonPage() {
       .then(({ data }) => setLesson(data))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, [lessonId]);
+
+  // Study session heartbeat: start a session, then heartbeat every 30s while the tab is visible.
+  useEffect(() => {
+    if (!lessonId) return;
+    let cancelled = false;
+
+    const sendHeartbeat = () => {
+      if (!sessionIdRef.current) return;
+      api
+        .post('/lesson-tracking/sessions/heartbeat', {
+          sessionId: sessionIdRef.current,
+          lessonId,
+        })
+        .catch(() => {});
+    };
+
+    const startHeartbeat = () => {
+      if (heartbeatIntervalRef.current) return;
+      heartbeatIntervalRef.current = setInterval(sendHeartbeat, 30000);
+    };
+
+    const stopHeartbeat = () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        sendHeartbeat();
+        startHeartbeat();
+      } else {
+        stopHeartbeat();
+      }
+    };
+
+    const endSession = () => {
+      if (!sessionIdRef.current) return;
+      const sessionId = sessionIdRef.current;
+      sessionIdRef.current = null;
+      stopHeartbeat();
+      try {
+        const payload = JSON.stringify({ sessionId, lessonId });
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon(
+            '/api/lesson-tracking/sessions/end',
+            new Blob([payload], { type: 'application/json' })
+          );
+        } else {
+          api.post('/lesson-tracking/sessions/end', { sessionId, lessonId }).catch(() => {});
+        }
+      } catch {
+        // best-effort
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      endSession();
+    };
+
+    api
+      .post('/lesson-tracking/sessions/start', { lessonId })
+      .then(({ data }) => {
+        if (cancelled) return;
+        sessionIdRef.current = data?.id ?? data?.sessionId ?? null;
+        if (document.visibilityState === 'visible') {
+          sendHeartbeat();
+          startHeartbeat();
+        }
+      })
+      .catch(() => {});
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      endSession();
+    };
   }, [lessonId]);
 
   const handleTimeUpdate = () => {
@@ -91,6 +177,7 @@ export default function LessonPage() {
                   className="w-full h-full"
                   controls
                   onTimeUpdate={handleTimeUpdate}
+                  aria-label="Lesson video. Use Space or K to play/pause, arrow keys or J/L to seek, up/down to adjust volume, M to mute, F for fullscreen."
                   data-testid="video-player"
                 />
               ) : (
@@ -101,7 +188,7 @@ export default function LessonPage() {
             </div>
             <div className="space-y-4">
               <h2 className="text-2xl font-bold">About this lesson</h2>
-              <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+              <div className="prose dark:prose-invert max-w-none text-base leading-relaxed text-gray-700 dark:text-gray-300">
                 {lesson.content}
               </div>
             </div>

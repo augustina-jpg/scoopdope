@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { within, expect } from '@storybook/test';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider } from './ThemeProvider';
 import { ThemeToggle } from './ThemeToggle';
 
 const meta = {
@@ -12,7 +12,7 @@ const meta = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <ThemeProvider>
         <div className="p-4 bg-white dark:bg-gray-900 rounded-lg">
           <Story />
         </div>

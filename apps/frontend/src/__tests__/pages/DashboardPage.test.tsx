@@ -39,6 +39,10 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('@/components/dashboard/UserActivityDashboard', () => ({
+  UserActivityDashboard: () => null,
+}));
+
 vi.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
     state: {

@@ -9,6 +9,7 @@ export interface AuthUser {
   role: string;
   avatarUrl?: string;
   stellarPublicKey?: string;
+  themePreference?: 'light' | 'dark' | 'system';
 }
 
 interface AuthState {

@@ -22,6 +22,7 @@ export interface UserProfile {
   mfaEnabled: boolean;
   referralCode: string | null;
   createdAt: string;
+  themePreference: 'light' | 'dark' | 'system';
 }
 
 /**
@@ -35,6 +36,8 @@ export interface UpdateUserDto {
   avatar?: string;
   /** Max 500 characters, HTML stripped */
   bio?: string;
+  /** Theme preference */
+  theme?: 'light' | 'dark' | 'system';
 }
 
 /**

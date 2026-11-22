@@ -2,10 +2,29 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from './notifications.service';
 import { NotificationType } from './notification.entity';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class NotificationsEvents {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(
+    private notificationsService: NotificationsService,
+    private emailService: EmailService,
+  ) {}
+
+  @OnEvent('application.submitted')
+  async handleApplicationSubmitted(payload: ApplicationEmailPayload) {
+    await this.emailService.sendApplicationReceived(payload);
+  }
+
+  @OnEvent('application.approved')
+  async handleApplicationApproved(payload: ApplicationEmailPayload) {
+    await this.emailService.sendApplicationApproved(payload);
+  }
+
+  @OnEvent('application.rejected')
+  async handleApplicationRejected(payload: ApplicationEmailPayload) {
+    await this.emailService.sendApplicationRejected(payload);
+  }
 
   @OnEvent('enrollment.created')
   async handleEnrollmentCreated(payload: { userId: string; courseName: string }) {
@@ -40,4 +59,23 @@ export class NotificationsEvents {
       `A spot opened up! You've been enrolled in "${payload.courseTitle}" from the waitlist.`,
     );
   }
+
+  @OnEvent('reward.earned')
+  async handleRewardEarned(payload: { userId: string; amount: number; type: string; reason: string }) {
+    await this.notificationsService.create(
+      payload.userId,
+      NotificationType.REWARD_EARNED,
+      `You earned ${payload.amount} BST tokens for "${payload.reason}"`,
+      'Reward Earned',
+    );
+  }
+}
+
+interface ApplicationEmailPayload {
+  applicationId: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  locale: string;
+  adminNote?: string | null;
 }

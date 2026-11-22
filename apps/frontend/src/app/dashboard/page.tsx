@@ -1,5 +1,19 @@
 'use client';
 
+/**
+ * Student Dashboard — issue #857
+ *
+ * Shows:
+ *  • Welcome + streak + token balance
+ *  • In-progress courses with progress bars & "Continue" links
+ *  • Completed courses (separate section) with certificate download links
+ *  • Certificate count badge
+ *  • Recently accessed courses (sorted by last activity)
+ *  • Active bundles & learning paths
+ *  • Recommended courses
+ *  • Mobile-responsive layout (single-column on small screens)
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
@@ -8,10 +22,11 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CircularProgress } from '@/components/ui/CircularProgress';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StreakWidget } from '@/components/ui/StreakWidget';
-import { TokenBalanceWidget } from '@/components/dashboard/TokenBalanceWidget';
+import { BalanceWidget } from '@/components/dashboard/BalanceWidget';
 import { CheckCircle2 } from 'lucide-react';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { useTranslations } from 'next-intl';
+import { UserActivityDashboard } from '@/components/dashboard/UserActivityDashboard';
 
 interface UserData {
   id: string;
@@ -25,6 +40,8 @@ interface ProgressRecord {
   id: string;
   courseId: string;
   progressPct: number;
+  /** ISO date of last activity — used for "recently accessed" sort */
+  updatedAt?: string;
 }
 
 interface CredentialRecord {
@@ -105,13 +122,12 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Data fetching ────────────────────────────────────────────────────────
+
   useEffect(() => {
     async function loadDashboard() {
       try {
-        if (!state.token && !state.isLoading) {
-          // ProtectedRoute will handle redirect; do not fetch yet.
-          return;
-        }
+        if (!state.token && !state.isLoading) return;
 
         let currentUser = user;
         if (!currentUser) {
@@ -127,9 +143,7 @@ export default function DashboardPage() {
           setUser(currentUser);
         }
 
-        if (!currentUser?.id) {
-          throw new Error('User information is missing.');
-        }
+        if (!currentUser?.id) throw new Error('User information is missing.');
 
         const [enrollmentsRes, progressRes, credRes] = await Promise.all([
           api.get(`/users/${currentUser.id}/enrollments`),
@@ -190,7 +204,6 @@ export default function DashboardPage() {
         const courseIds = enrollmentRecords
           .filter((enrollment) => !courseMap[enrollment.courseId])
           .map((enrollment) => enrollment.courseId);
-
         await Promise.all(
           courseIds.map(async (courseId) => {
             try {
@@ -200,13 +213,12 @@ export default function DashboardPage() {
                 courseMap[course.id] = { id: course.id, title: course.title };
               }
             } catch {
-              // ignore missing course details
+              // ignore
             }
           })
         );
-
         setCourses(courseMap);
-      } catch (err) {
+      } catch {
         setError('Unable to load dashboard information. Please refresh.');
       } finally {
         setIsLoading(false);
@@ -214,7 +226,8 @@ export default function DashboardPage() {
     }
 
     if (!state.isLoading) loadDashboard();
-  }, [state.isLoading, state.token, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.isLoading, state.token]);
 
   const enrolledCourses = useMemo(() => {
     const progressByCourse = new Map(
@@ -229,14 +242,13 @@ export default function DashboardPage() {
     }));
   }, [progress, enrollments, courses, t]);
 
-  const recentCredentials = useMemo(() => {
-    return credentials.slice(0, 5);
-  }, [credentials]);
+  const recentCredentials = useMemo(() => credentials.slice(0, 5), [credentials]);
 
   return (
     <ProtectedRoute>
       <OnboardingWizard />
-      <main className="max-w-5xl mx-auto p-8 space-y-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+        {/* ── Header ── */}
         <section>
           {isLoading ? (
             <div className="space-y-2">
@@ -248,7 +260,7 @@ export default function DashboardPage() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
                 {t('welcome', { name: user?.username ?? user?.email ?? t('student') })}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email}</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{user?.email}</p>
             </div>
           )}
         </section>
@@ -259,6 +271,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* ── Stats bar — streak + token balance + cert count ── */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
@@ -270,31 +283,30 @@ export default function DashboardPage() {
               isLoading={isLoading}
             />
           </div>
+
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              {t('tokenBalance')}
-            </h2>
-            <TokenBalanceWidget stellarPublicKey={state.user?.stellarPublicKey} />
+            <BalanceWidget stellarPublicKey={state.user?.stellarPublicKey} />
           </div>
         </section>
 
+        {/* ── Active Bundles ── */}
         {bundleEnrollments.length > 0 && (
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
               {t('activeBundles')}
             </h2>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {bundleEnrollments.map((enrollment) => (
                 <div
                   key={enrollment.id}
                   className="p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10"
                 >
                   <h3 className="font-bold text-gray-900 dark:text-white">
-                    {enrollment.bundle.title}
+                    {enrollment.bundle?.title}
                   </h3>
                   <div className="mt-2 flex items-center justify-between text-sm">
                     <span className="text-gray-500">
-                      {t('coursesCount', { count: enrollment.bundle.courses.length })}
+                      {t('coursesCount', { count: enrollment.bundle?.courses?.length ?? 0 })}
                     </span>
                     {enrollment.completedAt ? (
                       <span className="text-green-600 font-bold flex items-center">
@@ -310,6 +322,7 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {/* ── Learning Paths ── */}
         {pathEnrollments.length > 0 && (
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
@@ -322,7 +335,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={enrollment.id}
-                    className="p-4 rounded-lg border border-purple-100 dark:border-purple-900/30 bg-purple-50/30 dark:bg-purple-900/10"
+                    className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 bg-purple-50/30 dark:bg-purple-900/10"
                   >
                     <h3 className="font-bold text-gray-900 dark:text-white">{lp?.title}</h3>
                     <div className="mt-2 flex items-center justify-between text-sm">
@@ -342,6 +355,7 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {/* ── Recommended for You ── */}
         {recommendations.length > 0 && (
           <section>
             <div className="flex items-center justify-between">
@@ -360,7 +374,7 @@ export default function DashboardPage() {
                 <Link
                   key={course.id}
                   href={`/courses/${course.id}`}
-                  className="block rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 hover:shadow-md transition-shadow"
+                  className="block rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 hover:shadow-md transition-shadow"
                 >
                   <h3 className="font-semibold text-gray-900 dark:text-white">{course.title}</h3>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
@@ -374,7 +388,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
                   {course.matchReasons?.length > 0 && (
-                    <p className="mt-2 text-xs text-green-600 dark:text-green-400">
+                    <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
                       {course.matchReasons[0]}
                     </p>
                   )}
@@ -478,6 +492,11 @@ export default function DashboardPage() {
               ))
             )}
           </div>
+        </section>
+
+        {/* #883: User Activity Dashboard */}
+        <section>
+          <UserActivityDashboard />
         </section>
       </main>
     </ProtectedRoute>

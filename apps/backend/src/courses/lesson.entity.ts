@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
@@ -44,12 +45,26 @@ export class Lesson {
   @Column({ default: 0 })
   order: number;
 
+  // Why: persists the effective global lesson order across modules so that
+  // reordering modules can recompute sequential navigation indices.
+  @Column({ type: 'int', default: 0 })
+  globalOrder: number;
+
   @Column({ default: 0 })
   durationMinutes: number;
 
-  @OneToMany(() => Assignment, (assignment) => assignment.lesson)
+  @Column({ type: 'jsonb', nullable: true })
+  learningObjectives?: string[];
+
+  // Why: deleting a lesson removes its assignments to prevent orphan records.
+  @OneToMany(() => Assignment, (assignment) => assignment.lesson, {
+    cascade: ['remove'],
+  })
   assignments: Assignment[];
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

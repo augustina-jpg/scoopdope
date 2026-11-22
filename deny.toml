@@ -10,6 +10,20 @@ unmaintained = "warn"
 notice = "warn"
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
+#
+# Every entry MUST be documented with:
+#   - the advisory ID (RUSTSEC-YYYY-NNNN)
+#   - the crate and version range affected
+#   - a justification (why it is a false positive or not exploitable here)
+#   - an expiry date (YYYY-MM-DD) after which the entry must be removed or
+#     re-reviewed. Expired entries are tracked in the monthly vulnerability
+#     report workflow and must be resolved before the next release.
+#
+# Format:
+#   { id = "RUSTSEC-YYYY-NNNN", reason = "<justification> (expires: YYYY-MM-DD)" }
+#
+# Example (do not uncomment without a real justification and expiry):
+#   { id = "RUSTSEC-0000-0000", reason = "False positive: vulnerable code path not compiled (expires: 2025-12-31)" }
 ignore = []
 
 [licenses]

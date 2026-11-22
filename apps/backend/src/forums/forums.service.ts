@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Course } from '../courses/course.entity';
@@ -11,6 +17,7 @@ import { ModerationService } from '../moderation/moderation.service';
 import { ContentType } from '../moderation/moderation.enums';
 import { SearchService } from '../search/search.service';
 import { StreaksService } from '../streaks/streaks.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ForumsService {
@@ -25,7 +32,8 @@ export class ForumsService {
     private readonly voteRepo: Repository<ForumVote>,
     private readonly moderationService: ModerationService,
     private readonly searchService: SearchService,
-    private readonly streaksService: StreaksService
+    private readonly streaksService: StreaksService,
+    @Optional() private readonly eventEmitter?: EventEmitter2
   ) {}
 
   async findPostsByCourse(courseId: string) {
@@ -36,6 +44,78 @@ export class ForumsService {
       relations: ['user', 'replies', 'replies.user'],
       order: { isPinned: 'DESC', createdAt: 'DESC' },
     });
+  }
+
+  async findThreads(limit = 20, courseId?: string, after?: string) {
+    const safeLimit = Math.min(Math.max(1, isNaN(limit) ? 20 : limit), 100);
+
+    const qb = this.postRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.user', 'user')
+      .orderBy('post.createdAt', 'DESC')
+      .addOrderBy('post.id', 'DESC')
+      .take(safeLimit + 1);
+
+    if (courseId) {
+      qb.andWhere('post.courseId = :courseId', { courseId });
+    }
+
+    if (after) {
+      const cursor = this.decodeCursor(after);
+      qb.andWhere('(post.createdAt, post.id) < (:createdAt, :id)', {
+        createdAt: cursor.createdAt,
+        id: cursor.id,
+      });
+    }
+
+    const posts = await qb.getMany();
+    const hasMore = posts.length > safeLimit;
+    const pagePosts = hasMore ? posts.slice(0, safeLimit) : posts;
+
+    // Attach reply counts without loading all reply data
+    const postIds = pagePosts.map((p) => p.id);
+    let replyCounts: Map<string, number> = new Map();
+
+    if (postIds.length > 0) {
+      const counts = await this.replyRepo
+        .createQueryBuilder('reply')
+        .select('reply.postId', 'postId')
+        .addSelect('COUNT(reply.id)', 'count')
+        .where('reply.postId IN (:...postIds)', { postIds })
+        .groupBy('reply.postId')
+        .getRawMany<{ postId: string; count: string }>();
+
+      replyCounts = new Map(counts.map((r) => [r.postId, parseInt(r.count, 10)]));
+    }
+
+    const data = pagePosts.map((p) => ({
+      ...p,
+      replyCount: replyCounts.get(p.id) ?? 0,
+    }));
+
+    const last = pagePosts[pagePosts.length - 1];
+    const nextCursor = hasMore && last ? this.encodeCursor(last) : null;
+
+    return { data, nextCursor, hasMore };
+  }
+
+  private encodeCursor(post: Post): string {
+    const createdAt = post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt;
+    return Buffer.from(`${createdAt}_${post.id}`, 'utf8').toString('base64');
+  }
+
+  private decodeCursor(cursor: string): { createdAt: Date; id: string } {
+    const decoded = Buffer.from(cursor, 'base64').toString('utf8');
+    const separatorIndex = decoded.lastIndexOf('_');
+    if (separatorIndex === -1) {
+      throw new BadRequestException('Invalid cursor');
+    }
+    const createdAt = new Date(decoded.slice(0, separatorIndex));
+    const id = decoded.slice(separatorIndex + 1);
+    if (isNaN(createdAt.getTime()) || !id) {
+      throw new BadRequestException('Invalid cursor');
+    }
+    return { createdAt, id };
   }
 
   async getThread(threadId: string, page = 1, limit = 20) {
@@ -119,6 +199,9 @@ export class ForumsService {
     });
 
     const savedReply = await this.replyRepo.save(reply);
+    if (post.userId !== userId) {
+      this.eventEmitter?.emit('peer.helped', { userId });
+    }
 
     if (savedReply.isAnswer) {
       post.answerReplyId = savedReply.id;

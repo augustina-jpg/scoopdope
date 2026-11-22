@@ -64,6 +64,8 @@ pub struct BuybackAnalytics {
 const BUYBACK_EXECUTED: Symbol = symbol_short!("buyback");
 const BUYBACK_TRIGGERED: Symbol = symbol_short!("trigger");
 const CONFIG_UPDATED: Symbol = symbol_short!("config_up");
+const BUYBACK_SCHEDULED: Symbol = symbol_short!("bb_sched");
+const BUYBACK_CANCELLED: Symbol = symbol_short!("bb_cncl");
 
 // =============================================================================
 // Contract
@@ -178,7 +180,7 @@ impl BuybackContract {
         }
 
         // Get current BST price from oracle
-        let bst_price = Self::get_bst_price(env.clone());
+        let bst_price = Self::get_bst_price(&env);
         if bst_price <= config.price_threshold {
             return; // Price not low enough for buyback
         }
@@ -198,7 +200,7 @@ impl BuybackContract {
         }
 
         // Execute buyback via DEX
-        Self::execute_buyback_via_dex(env, max_buyback_xlm, bst_price, symbol_short!("price_thresh"));
+        Self::execute_buyback_via_dex(env, max_buyback_xlm, bst_price, symbol_short!("threshold"));
     }
 
     pub fn manual_buyback(
@@ -216,7 +218,7 @@ impl BuybackContract {
         let reserve_balance: i128 = env.storage().instance().get(&DataKey::BuybackReserve).unwrap_or(0);
         assert!(reserve_balance >= max_xlm_amount + config.min_reserve_balance, "Insufficient reserve for buyback");
 
-        let bst_price = Self::get_bst_price(env.clone());
+        let bst_price = Self::get_bst_price(&env);
 
         Self::execute_buyback_via_dex(env, max_xlm_amount, bst_price, symbol_short!("manual"));
     }
@@ -264,7 +266,7 @@ impl BuybackContract {
         let mut last_timestamp = 0_u64;
 
         for i in 0..history_count {
-            if let Some(record) = env.storage().instance().get(&DataKey::BuybackHistory(i)) {
+            if let Some(record) = env.storage().instance().get::<_, BuybackRecord>(&DataKey::BuybackHistory(i)) {
                 total_xlm_spent = total_xlm_spent.checked_add(record.xlm_spent).unwrap_or(total_xlm_spent);
                 last_timestamp = last_timestamp.max(record.timestamp);
             }
@@ -352,7 +354,48 @@ impl BuybackContract {
         env.storage().instance().set(&DataKey::BuybackHistoryCount, &(history_count + 1));
         env.storage().instance().set(&DataKey::LastBuybackLedger, &env.ledger().sequence());
 
-        env.events()
-            .publish((BUYBACK_EXECUTED, symbol_short!("amount")), (bst_to_buy, xlm_amount));
+        env.events().publish(
+            (BUYBACK_EXECUTED, symbol_short!("amount")),
+            (bst_to_buy, xlm_amount),
+        );
+        env.events().publish(
+            (BUYBACK_EXECUTED, symbol_short!("executed")),
+            (
+                history_count,
+                bst_to_buy,
+                xlm_amount,
+                bst_price,
+                record.trigger_reason.clone(),
+                record.ledger,
+                record.timestamp,
+            ),
+        );
+    }
+
+    fn emit_buyback_scheduled(
+        env: &Env,
+        scheduled_ledger: u32,
+        max_xlm_amount: i128,
+        bst_price: i128,
+        trigger_reason: Symbol,
+    ) {
+        env.events().publish(
+            (BUYBACK_SCHEDULED, symbol_short!("scheduled")),
+            (scheduled_ledger, max_xlm_amount, bst_price, trigger_reason),
+        );
+    }
+
+    fn emit_buyback_cancelled(
+        env: &Env,
+        scheduled_ledger: u32,
+        reason: Symbol,
+    ) {
+        env.events().publish(
+            (BUYBACK_CANCELLED, symbol_short!("cancelled")),
+            (scheduled_ledger, reason),
+        );
     }
 }
+
+#[cfg(test)]
+mod test;

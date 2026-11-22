@@ -20,4 +20,8 @@ export class UpdateUserDto {
   @Trim()
   @Sanitize(StripHtmlSanitizer)
   bio?: string;
+
+  @IsOptional()
+  @IsString()
+  theme?: 'light' | 'dark' | 'system';
 }

@@ -7,8 +7,10 @@ module.exports = {
   },
   collectCoverageFrom: [
     '**/*.(t|j)s',
+    'kyc/**/*.(t|j)s',
   ],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/../test/setup/external-mocks.ts'],
   testTimeout: 60000,
 };

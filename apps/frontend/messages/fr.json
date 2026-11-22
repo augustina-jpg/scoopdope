@@ -167,7 +167,12 @@
     "releasedDate": "Publié le {date}",
     "moduleAvailableOn": "Ce module sera disponible le",
     "futureDate": "à une date ultérieure",
-    "lessonMinutes": "{count, plural, one {# minute} other {# minutes}}"
+    "lessonMinutes": "{count, plural, one {# minute} other {# minutes}}",
+    "noLessonsYet": "Aucune leçon pour le moment",
+    "addFirstLesson": "Ajoutez votre première leçon pour commencer à créer ce cours.",
+    "lessonsComingSoon": "Les leçons de ce cours arrivent bientôt. Revenez plus tard.",
+    "addLesson": "Ajouter une leçon",
+    "browseOtherCourses": "Parcourir d'autres cours"
   },
   "reviews": {
     "courseReviews": "Avis sur le cours",

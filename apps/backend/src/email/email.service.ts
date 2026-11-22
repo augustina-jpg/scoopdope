@@ -27,7 +27,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     private config: ConfigService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
     this.transporter = nodemailer.createTransport({
       host: this.config.get<string>('mail.host'),
       port: this.config.get<number>('mail.port'),
@@ -36,7 +36,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     });
 
     // Set up PostgreSQL LISTEN/NOTIFY for instant queue processing
-    await this.setupPgListener();
+    void this.setupPgListener();
 
     // Safety fallback — process any missed notifications every 60s
     this.safetyTimer = setInterval(() => this.processQueue(), 60_000);
@@ -98,6 +98,53 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
     setImmediate(() => this.processQueue());
   }
 
+  async sendApplicationReceived(data: {
+    userEmail: string;
+    userName: string;
+    locale?: string;
+  }): Promise<void> {
+    const template = emailTemplates.applicationReceived({
+      ...data,
+      locale: data.locale ?? 'en',
+    });
+    await this.enqueue(data.userEmail, template.subject, template.html);
+  }
+
+  async sendApplicationApproved(data: {
+    userEmail: string;
+    userName: string;
+    locale?: string;
+  }): Promise<void> {
+    const template = emailTemplates.applicationApproved({
+      ...data,
+      locale: data.locale ?? 'en',
+    });
+    await this.enqueue(data.userEmail, template.subject, template.html);
+  }
+
+  async sendApplicationRejected(data: {
+    userEmail: string;
+    userName: string;
+    locale?: string;
+    adminNote?: string | null;
+  }): Promise<void> {
+    const template = emailTemplates.applicationRejected({
+      ...data,
+      locale: data.locale ?? 'en',
+    });
+    await this.enqueue(data.userEmail, template.subject, template.html);
+  }
+
+  async sendWaitlistConfirmation(data: {
+    userEmail: string;
+    userName: string;
+    position: number;
+    locale?: string;
+  }): Promise<void> {
+    const template = emailTemplates.waitlistConfirmation(data);
+    await this.enqueue(data.userEmail, template.subject, template.html);
+  }
+
   private async notifyPg() {
     if (!this.pgClient) return;
     try {
@@ -157,8 +204,40 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
 
   // --- Event listeners ---
 
+  @OnEvent('user.registered')
+  async onUserRegistered(payload: { userId: string; userEmail: string; userName: string; verificationToken: string; locale?: string }) {
+    const verificationUrl = `${this.config.get('frontend.url')}/auth/verify?token=${payload.verificationToken}`;
+    const logoUrl = this.config.get<string>('email.logoUrl');
+    
+    const tpl = emailTemplates.welcome({
+      userName: payload.userName,
+      verificationUrl,
+      logo: logoUrl,
+      locale: payload.locale ?? 'en',
+    });
+    
+    await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
+  }
+
+  @OnEvent('password.reset.requested')
+  async onPasswordResetRequested(payload: { userId: string; userEmail: string; userName: string; resetToken: string; expiresIn?: string; locale?: string }) {
+    const resetUrl = `${this.config.get('frontend.url')}/auth/reset-password?token=${payload.resetToken}`;
+    const logoUrl = this.config.get<string>('email.logoUrl');
+    const expiresIn = payload.expiresIn || '1 hour';
+    
+    const tpl = emailTemplates.passwordReset({
+      userName: payload.userName,
+      resetUrl,
+      expiresIn,
+      logo: logoUrl,
+      locale: payload.locale ?? 'en',
+    });
+    
+    await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
+  }
+
   @OnEvent('enrollment.created')
-  async onEnrollment(payload: { userId: string; courseId: string; userEmail: string; userName: string; courseTitle: string }) {
+  async onEnrollment(payload: { userId: string; courseId: string; userEmail: string; userName: string; courseTitle: string; locale?: string }) {
     const prefs = await this.getOrCreatePrefs(payload.userId);
     if (prefs.unsubscribedAll || !prefs.enrollment) return;
 
@@ -167,12 +246,13 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       courseTitle: payload.courseTitle,
       courseUrl: `${this.config.get('frontend.url')}/courses/${payload.courseId}`,
       unsubscribeUrl: this.unsubscribeUrl(prefs.unsubscribeToken),
+      locale: payload.locale ?? 'en',
     });
     await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
   }
 
   @OnEvent('enrollment.completed')
-  async onCompletion(payload: { userId: string; courseId: string; userEmail: string; userName: string; courseTitle: string }) {
+  async onCompletion(payload: { userId: string; courseId: string; userEmail: string; userName: string; courseTitle: string; locale?: string }) {
     const prefs = await this.getOrCreatePrefs(payload.userId);
     if (prefs.unsubscribedAll || !prefs.completion) return;
 
@@ -181,12 +261,13 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       courseTitle: payload.courseTitle,
       credentialUrl: `${this.config.get('frontend.url')}/credentials`,
       unsubscribeUrl: this.unsubscribeUrl(prefs.unsubscribeToken),
+      locale: payload.locale ?? 'en',
     });
     await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
   }
 
   @OnEvent('credential.issued')
-  async onCredentialIssued(payload: { userId: string; userEmail: string; userName: string; courseTitle: string; txHash: string }) {
+  async onCredentialIssued(payload: { userId: string; userEmail: string; userName: string; courseTitle: string; txHash: string; locale?: string }) {
     const prefs = await this.getOrCreatePrefs(payload.userId);
     if (prefs.unsubscribedAll || !prefs.credentialIssued) return;
 
@@ -195,12 +276,45 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       courseTitle: payload.courseTitle,
       txHash: payload.txHash,
       unsubscribeUrl: this.unsubscribeUrl(prefs.unsubscribeToken),
+      locale: payload.locale ?? 'en',
+    });
+    await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
+  }
+
+  @OnEvent('certificate.issued')
+  async onCertificateIssued(payload: { userId: string; userEmail: string; userName: string; courseTitle: string; certificateId: string; txHash: string; locale?: string }) {
+    const prefs = await this.getOrCreatePrefs(payload.userId);
+    if (prefs.unsubscribedAll || !prefs.credentialIssued) return;
+
+    const logoUrl = this.config.get<string>('email.logoUrl');
+    const tpl = emailTemplates.certificateIssued({
+      userName: payload.userName,
+      courseTitle: payload.courseTitle,
+      certificateUrl: `${this.config.get('frontend.url')}/certificates/${payload.certificateId}`,
+      txHash: payload.txHash,
+      logo: logoUrl,
+      locale: payload.locale ?? 'en',
+    });
+    await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
+  }
+
+  @OnEvent('reward.earned')
+  async onRewardEarned(payload: { userId: string; userEmail: string; userName: string; amount: number; courseTitle: string; txHash: string }) {
+    const prefs = await this.getOrCreatePrefs(payload.userId);
+    if (prefs.unsubscribedAll || !prefs.rewardEarned) return;
+
+    const tpl = emailTemplates.rewardEarned({
+      userName: payload.userName,
+      amount: payload.amount,
+      courseTitle: payload.courseTitle,
+      txHash: payload.txHash,
+      unsubscribeUrl: this.unsubscribeUrl(prefs.unsubscribeToken),
     });
     await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
   }
 
   @OnEvent('module.unlocked')
-  async onModuleUnlocked(payload: { userId: string; userEmail: string; userName: string; courseId: string; courseTitle: string; moduleTitle: string }) {
+  async onModuleUnlocked(payload: { userId: string; userEmail: string; userName: string; courseId: string; courseTitle: string; moduleTitle: string; locale?: string }) {
     const prefs = await this.getOrCreatePrefs(payload.userId);
     if (prefs.unsubscribedAll || !prefs.enrollment) return;
 
@@ -210,6 +324,7 @@ export class EmailService implements OnModuleInit, OnModuleDestroy {
       moduleTitle: payload.moduleTitle,
       courseUrl: `${this.config.get('frontend.url')}/courses/${payload.courseId}`,
       unsubscribeUrl: this.unsubscribeUrl(prefs.unsubscribeToken),
+      locale: payload.locale ?? 'en',
     });
     await this.enqueue(payload.userEmail, tpl.subject, tpl.html);
   }

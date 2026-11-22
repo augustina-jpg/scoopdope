@@ -3,8 +3,10 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository, In, IsNull } from 'typeorm';
 import { LearningPath } from './learning-path.entity';
 import { LearningPathEnrollment } from './learning-path-enrollment.entity';
@@ -16,6 +18,8 @@ import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class LearningPathsService {
+  private readonly logger = new Logger(LearningPathsService.name);
+
   constructor(
     @InjectRepository(LearningPath)
     private pathRepo: Repository<LearningPath>,
@@ -26,6 +30,7 @@ export class LearningPathsService {
     private enrollmentsService: EnrollmentsService,
     private credentialsService: CredentialsService,
     private usersService: UsersService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   findAll(publishedOnly = true) {
@@ -107,13 +112,16 @@ export class LearningPathsService {
       where: { userId, completedAt: IsNull() },
       relations: ['learningPath', 'learningPath.courses'],
     });
+    const userEnrollments = enrollments.length
+      ? await this.enrollmentsService.findByUser(userId)
+      : [];
+    let user: Awaited<ReturnType<UsersService['findById']>> | undefined;
 
     for (const enrollment of enrollments) {
       const inPath = enrollment.learningPath.courses.some((c) => c.id === courseId);
       if (!inPath) continue;
 
       const courseIds = enrollment.learningPath.courses.map((c) => c.id);
-      const userEnrollments = await this.enrollmentsService.findByUser(userId);
       const pathEnrollments = userEnrollments.filter((e) => courseIds.includes(e.courseId));
       const allCompleted =
         pathEnrollments.length === courseIds.length &&
@@ -123,7 +131,7 @@ export class LearningPathsService {
         enrollment.completedAt = new Date();
         await this.enrollmentRepo.save(enrollment);
 
-        const user = await this.usersService.findById(userId);
+        user ??= await this.usersService.findById(userId);
         if (user?.stellarPublicKey) {
           await this.credentialsService.issueLearningPath(
             userId,
@@ -131,6 +139,14 @@ export class LearningPathsService {
             user.stellarPublicKey,
           );
         }
+
+        // Emit path completion event so the notifications module can notify the learner.
+        this.eventEmitter.emit('learningPath.completed', {
+          userId,
+          learningPathId: enrollment.learningPathId,
+          learningPathTitle: enrollment.learningPath.title,
+          completedAt: enrollment.completedAt,
+        });
       }
     }
   }

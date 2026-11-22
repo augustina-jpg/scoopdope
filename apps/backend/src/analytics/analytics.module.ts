@@ -2,19 +2,30 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CourseAnalytics } from './course-analytics.entity';
+import { BuybackEvent } from './buyback-event.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Progress } from '../progress/progress.entity';
 import { Review } from '../courses/review.entity';
 import { User } from '../users/user.entity';
+import { Course } from '../courses/course.entity';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
+import { AnalyticsEvents } from './analytics.events';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    TypeOrmModule.forFeature([CourseAnalytics, Enrollment, Progress, Review, User]),
+    TypeOrmModule.forFeature([
+      CourseAnalytics,
+      BuybackEvent,
+      Enrollment,
+      Progress,
+      Review,
+      User,
+      Course,
+    ]),
   ],
-  providers: [AnalyticsService],
+  providers: [AnalyticsService, AnalyticsEvents],
   controllers: [AnalyticsController],
   exports: [AnalyticsService],
 })

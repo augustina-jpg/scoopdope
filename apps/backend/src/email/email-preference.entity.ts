@@ -19,6 +19,9 @@ export class EmailPreference {
   credentialIssued!: boolean;
 
   @Column({ default: true })
+  rewardEarned!: boolean;
+
+  @Column({ default: true })
   marketing!: boolean;
 
   @Column({ nullable: true, unique: true })

@@ -5,6 +5,8 @@ export enum AuditAction {
   LOGIN_FAILURE = 'auth.login.failure',
   LOGOUT = 'auth.logout',
   REGISTER = 'auth.register',
+  TOKEN_REFRESHED = 'auth.token.refreshed',
+  TOKEN_REUSE_DETECTED = 'auth.token.reuse_detected',
   PASSWORD_RESET_REQUEST = 'auth.password_reset.request',
   PASSWORD_RESET_COMPLETE = 'auth.password_reset.complete',
   MFA_ENABLED = 'auth.mfa.enabled',
@@ -16,8 +18,14 @@ export enum AuditAction {
   ADMIN_ACTION = 'admin.action',
   ROLE_CHANGED = 'admin.role_changed',
   USER_BANNED = 'admin.user_banned',
+  USER_SUSPENDED = 'admin.user_suspended',
+  USER_DEACTIVATED = 'admin.user_deactivated',
   USER_DELETED = 'admin.user_deleted',
   USER_BULK_DELETED = 'admin.user_bulk_deleted',
+  COURSE_APPROVED = 'admin.course_approved',
+  COURSE_ARCHIVED = 'admin.course_archived',
+  COURSE_UNARCHIVED = 'admin.course_unarchived',
+  COURSE_DELETED = 'admin.course_deleted',
   SECRET_ROTATED = 'secret.rotated',
   GDPR_DATA_EXPORT = 'gdpr.data_export',
   GDPR_ACCOUNT_DELETION = 'gdpr.account_deletion',
@@ -27,6 +35,7 @@ export enum AuditAction {
 @Index(['userId'])
 @Index(['action'])
 @Index(['createdAt'])
+@Index(['resourceType', 'resourceId'])
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,7 +46,23 @@ export class AuditLog {
   @Column()
   action: string;
 
-  @Column({ nullable: true })
+  /** The type of resource this action was performed on (e.g. "user", "course"). */
+  @Column({ nullable: true, type: 'varchar', length: 64 })
+  resourceType: string | null;
+
+  /** The UUID of the specific resource this action targeted. */
+  @Column({ nullable: true, type: 'uuid' })
+  resourceId: string | null;
+
+  /**
+   * Field-level change tracking: { field: { from: oldValue, to: newValue } }.
+   * Only populated for update actions.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+
+  /** Masked source IP of the actor (last octet replaced with "*"); supports IPv6 (max 45 chars). */
+  @Column({ nullable: true, type: 'varchar', length: 45 })
   ipAddress: string | null;
 
   @Column({ nullable: true })

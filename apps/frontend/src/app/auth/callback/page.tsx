@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { useThemeStore } from '@/store/theme.store';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -15,6 +16,11 @@ export default function AuthCallbackPage() {
     const refreshToken = searchParams.get('refresh_token');
 
     if (!accessToken) {
+      // Revisiting the callback (e.g. via browser back) after a successful login
+      if (useAuthStore.getState().token) {
+        router.replace('/dashboard');
+        return;
+      }
       router.replace('/auth/login?error=oauth_failed');
       return;
     }
@@ -26,6 +32,9 @@ export default function AuthCallbackPage() {
       .get('/users/me')
       .then((res) => {
         login(accessToken, res.data);
+        if (res.data.themePreference) {
+          useThemeStore.getState().syncTheme(res.data.themePreference);
+        }
         router.replace('/dashboard');
       })
       .catch(() => {
