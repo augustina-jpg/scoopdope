@@ -210,177 +210,62 @@ rustup target add wasm32-unknown-unknown
 ./scripts/build.sh
 ```
 
-## Docker Setup
+---
 
-Containerized development and production environment for backend + PostgreSQL + Redis.
+## Running with Docker
 
-### Quick Start with Docker
+The repository ships with a `Dockerfile` and `docker-compose.yml` that bring up the **backend**, **PostgreSQL**, and **Redis** together, so you can run the API without installing Node.js or a database locally.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (`docker compose version`)
+
+### 1. Configure environment variables
 
 ```bash
-# 1. Copy environment template
 cp .env.example .env
-
-# 2. Edit .env (JWT_SECRET, STELLAR_SECRET_KEY, etc.)
-#    Note: DATABASE_HOST=postgres, DATABASE_USERNAME=scoopdope, etc. are auto-set
-
-# 3. Start services (production mode)
-docker compose up -d --build backend postgres redis
-
-# Production API: http://localhost:3000/api
-# Swagger docs: http://localhost:3000/api/docs
-
-# Development (with hot reload):
-# docker compose up -d --build  # Uses docker-compose.override.yml automatically
-
-# Logs:
-docker compose logs -f backend
-
-# Stop & clean volumes:
-docker compose down -v
+# Edit .env and set at minimum JWT_SECRET and STELLAR_SECRET_KEY
 ```
 
-**Key Notes:**
-- **Default DB**: `scoopdope` db/user/pass (override in `.env`)
-- **Dev Mode**: Auto hot-reload via src/ mount + `nest start --watch`
-- **Persistence**: `postgres_data` / `redis_data` volumes
-- **Healthchecks**: Backend waits for DB ready
-- Frontend/contracts run separately (npm/yarn)
+`.env.example` is the source of truth for required variables. The compose file wires the database connection for you, so you do **not** need to set `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, or `DATABASE_NAME` — they are injected automatically to point at the `postgres` service.
 
-> For full production setup, Docker orchestration, and Stellar mainnet configuration, see [`docs/production-deployment-guide.md`](./docs/production-deployment-guide.md).
-
----
-
-## Smart Contract Deployment
+### 2. Start the stack
 
 ```bash
-# Deploy to testnet
-./scripts/deploy.sh testnet analytics
-
-# Deploy to mainnet
-./scripts/deploy.sh mainnet token
+docker compose up --build
 ```
 
-Requires `STELLAR_SECRET_KEY` set in your environment.
+This starts three services:
 
----
-
-## Smart Contract ABI
-
-The Soroban contracts expose a public interface (ABI) that the backend and Stellar CLI use to invoke them. Each contract function is documented inline with Rust doc comments (`///`) covering its parameters and return type, and the full interface is catalogued in the ABI reference.
-
-| Contract | Function | Parameters | Returns |
-|---|---|---|---|
-| Analytics | `record_progress` | `student: Address`, `course_id: Symbol`, `progress: u32` | `()` |
-| Analytics | `get_progress` | `student: Address`, `course_id: Symbol` | `u32` |
-| Token | `mint_reward` | `to: Address`, `amount: i128` | `()` |
-| Token | `balance` | `owner: Address` | `i128` |
-| Shared | `grant_role` | `admin: Address`, `account: Address`, `role: Symbol` | `()` |
-| Shared | `has_role` | `account: Address`, `role: Symbol` | `bool` |
-
-> Full ABI reference with argument types, return values, and invocation examples: [`docs/contract-abi.md`](./docs/contract-abi.md)
-
----
-
-## Environment Variables
-
-See `.env.example` for the full list. Key variables:
-
-| Variable | Description |
-|---|---|
-| `DATABASE_HOST` | PostgreSQL host |
-| `DATABASE_NAME` | Database name (default: `scoopdope`) |
-| `JWT_SECRET` | Secret for signing JWT tokens |
-| `STELLAR_SECRET_KEY` | Stellar account secret for credential issuance |
-| `STELLAR_NETWORK` | `testnet` or `mainnet` |
-| `NEXT_PUBLIC_API_URL` | Backend API URL for the frontend |
-
----
-
-## API Endpoints
-
-All API endpoints are prefixed with `/api/v1` for versioning.
-
-| Method | Path | Description |
+| Service | Description | Host port |
 |---|---|---|
-| POST | `/api/v1/auth/register` | Register a new user |
-| POST | `/api/v1/auth/login` | Login and receive JWT |
+| `backend` | NestJS REST API | `3000` |
+| `postgres` | PostgreSQL database | `5432` |
+| `redis` | Redis cache / sessions | `6379` |
 
-| GET | `/api/v1/courses` | List all published courses |
-| GET | `/api/v1/courses/:id` | Get a single course |
-| GET | `/api/v1/users/:id` | Get user profile |
-| GET | `/api/v1/stellar/balance/:publicKey` | Get Stellar account balances |
+Run detached with `docker compose up -d --build`, and follow logs with `docker compose logs -f backend`.
 
-**Interactive API Documentation:**
-- Local: `http://localhost:3000/api/docs`
-- Production: [https://nonso-eze.github.io/scoopdope/](https://nonso-eze.github.io/scoopdope/)
-- Error Codes Reference: [`docs/api-error-codes.md`](./docs/api-error-codes.md)
+### 3. Verify the stack is healthy
 
-**Versioning Policy:**
-All routes use the `/v1` prefix. For details on breaking-change rules, the deprecation timeline (90-day sunset window), header-based version negotiation, and migration examples, see [`docs/api-versioning.md`](./docs/api-versioning.md).
+Once the containers are up, confirm the API is responding:
 
----
+```bash
+curl -i http://localhost:3000/health
+# HTTP/1.1 200 OK
+```
 
-## License
+A `200 OK` response confirms the backend started cleanly and can reach its dependencies. Swagger docs are available at http://localhost:3000/api/docs.
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+### 4. Stop the stack
 
----
+```bash
+docker compose down       # stop containers
+# docker compose down -v  # also remove the postgres_data / redis_data volumes
+```
 
-## CI/CD
+**Notes:**
+- Data persists across restarts in the `postgres_data` and `redis_data` volumes.
+- The backend waits for PostgreSQL to pass its healthcheck before starting.
+- The frontend and Soroban contracts are not part of the compose stack; run them with `npm` / `./scripts/build.sh` as described above.
 
-GitHub Actions workflows in `.github/workflows/` run on every push and PR:
-
-- **Backend**: install → build → test → lint
-- **Frontend**: install → build → lint
-- **Contracts**: `cargo test` → `cargo fmt --check` → `cargo clippy`
-- **API Docs**: auto-deploy Swagger UI to GitHub Pages on push to `main`
-- **Release**: semantic versioning via release-please, auto-generated `CHANGELOG.md`
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contributing guide, including:
-
-- Development environment setup
-- Branching conventions (`feature/`, `fix/`, `chore/`, `docs/`, `test/`)
-- Commit message format (Conventional Commits)
-- How to run backend, frontend, and contract test suites
-- Pull-request review process
-
-Quick summary:
-
-1. Fork the reposi
-
-*Built with ❤️ on the Stellar network. Inspired by [StrellerMinds](https://github.com/StarkMindsHQ) by StarkMindsHQ.*
-
-## Handsoff notes
-
-<!-- handsoff-issue-1009 -->
-- #1009: Nested resource URLs are inconsistent
-<!-- handsoff-issue-984 -->
-- #984: Course completion percentage calculation is incorrect
-
-<!-- handsoff-issue-975 -->
-- #975: BST rewards not rolled back on course unenrollment
-
-<!-- handsoff-issue-977 -->
-- #977: Wallet creation does not store public key in DB
-
-<!-- handsoff-issue-1011 -->
-- #1011: DELETE endpoints return 200 instead of 204
-
-<!-- handsoff-issue-1012 -->
-- #1012: Query parameter injection not sanitized
-
-<!-- handsoff-issue-1025 -->
-- #1025: No database indexes on foreign keys
-
-<!-- handsoff-issue-1334 -->
-- #1334: Implement Bookmarks and Learning Lists
-
-<!-- handsoff-issue-1335 -->
-- #1335: Add Announcement System for Instructors
-
-<!-- handsoff-issue-1336 -->
-- #1336: Implement User Deactivation and Reactivation
+> For production deployment, image hardening, and Stellar mainnet configuration, see [`docs/production-deployment-guide.md`](./docs/production-deployment-guide.md).
