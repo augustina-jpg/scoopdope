@@ -269,3 +269,8 @@ docker compose down       # stop containers
 - The frontend and Soroban contracts are not part of the compose stack; run them with `npm` / `./scripts/build.sh` as described above.
 
 > For production deployment, image hardening, and Stellar mainnet configuration, see [`docs/production-deployment-guide.md`](./docs/production-deployment-guide.md).
+
+## Handsoff notes
+
+<!-- handsoff-issue-1281 -->
+- #1281: Implement Rate Limiting on Auth Endpoints
