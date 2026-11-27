@@ -28,6 +28,7 @@ This document provides a comprehensive catalog of all numeric error codes return
    - [503 Service Unavailable](#503-service-unavailable)
    - [504 Gateway Timeout](#504-gateway-timeout)
 5. [Client Handling & Best Practices](#5-client-handling--best-practices)
+6. [Course Management Role Matrix](#6-course-management-role-matrix)
 
 ---
 
@@ -190,8 +191,7 @@ All error responses from the scoopdope API share a uniform JSON shape, defined b
 ## 4. Server Error Codes (5xx)
 
 ### 500 Internal Server Error
-- **Cause**: An unexpected runtime error occurred on the server.
-- **Note**: Internal stack traces are suppressed in production. The client should refer to `correlationId` when contacting system administrators.
+- **Cause**: An unexpected runtime exception occurred that was not handled by a more specific exception filter.
 - **Example Payload**:
   ```json
   {
@@ -201,46 +201,61 @@ All error responses from the scoopdope API share a uniform JSON shape, defined b
     "details": null,
     "timestamp": "2026-09-30T12:00:00.000Z",
     "correlationId": "8f1a34b2-0007-4444-9999-abcdef123456",
-    "path": "/api/v1/certificates/issue"
+    "path": "/api/v1/courses"
   }
   ```
 
 ### 502 Bad Gateway
-- **Cause**: Upstream dependencies such as Stellar Horizon or Soroban RPC node failed to return a valid response.
-- **Example Payload**:
-  ```json
-  {
-    "statusCode": 502,
-    "error": "Bad Gateway",
-    "message": "Stellar Horizon RPC service unavailable",
-    "details": null,
-    "timestamp": "2026-09-30T12:00:00.000Z",
-    "correlationId": "8f1a34b2-0008-4444-9999-abcdef123456",
-    "path": "/api/v1/stellar/transaction"
-  }
-  ```
+- **Cause**: An upstream dependency (Stellar Horizon or Soroban RPC) failed or returned an invalid response.
+- **Client Action**: Retry with exponential backoff; surface `correlationId` to support if persistent.
 
 ### 503 Service Unavailable
-- **Cause**: Backend server is undergoing maintenance, database connection pool is saturated, or Redis is down.
-- **Example Payload**:
-  ```json
-  {
-    "statusCode": 503,
-    "error": "Service Unavailable",
-    "message": "Database connection temporarily unavailable",
-    "details": null,
-    "timestamp": "2026-09-30T12:00:00.000Z",
-    "correlationId": "8f1a34b2-0009-4444-9999-abcdef123456",
-    "path": "/api/v1/courses"
-  }
-  ```
+- **Cause**: The API is under maintenance or the database connection pool is exhausted.
+- **Client Action**: Honor `Retry-After` when present and retry after the maintenance window.
+
+### 504 Gateway Timeout
+- **Cause**: An upstream blockchain node did not confirm a transaction within the configured timeout.
+- **Client Action**: Poll transaction status by tx hash rather than blindly resubmitting.
 
 ---
 
 ## 5. Client Handling & Best Practices
 
-1. **Check `statusCode`**: Always parse the numeric `statusCode` instead of regex-matching the `message` string.
-2. **Track `correlationId`**: Log the `correlationId` on client telemetry whenever an error occurs for fast triaging with backend logs.
-3. **Handle Rate Limiting (429)**: Respect the `Retry-After` header using exponential backoff with jitter.
-4. **Token Refresh (401)**: Intercept 401 responses to automatically request a refreshed access token before redirecting to the login screen.
-5. **Form Field Mapping (400)**: When `details` is present, display validation warnings directly adjacent to the respective input fields in the UI.
+- Treat `401` as "re-authenticate" and `403` as "do not retry without elevated permissions".
+- Always log the `correlationId` from error payloads; it is the fastest path to server-side diagnosis.
+- For `429`, respect `Retry-After` and apply jittered exponential backoff.
+- For `5xx`, retry idempotent requests with backoff; never retry non-idempotent mutations without an idempotency key.
+- Validate payloads client-side to avoid predictable `400` responses.
+
+---
+
+## 6. Course Management Role Matrix
+
+All `/v1/courses` management routes are protected by the `RolesGuard` and mirror the RBAC roles defined in the `shared` Soroban contract. Requests from authenticated users whose role is not listed return `403 Forbidden`.
+
+| Method | Route | Allowed Roles | Notes |
+|--------|-------|---------------|-------|
+| `GET` | `/v1/courses` | Public | List published courses. |
+| `GET` | `/v1/courses/:id` | Public | Retrieve a single course. |
+| `POST` | `/v1/courses` | `INSTRUCTOR`, `ADMIN` | Create a new course. |
+| `PATCH` | `/v1/courses/:id` | `INSTRUCTOR`, `ADMIN` | Update course metadata. |
+| `DELETE` | `/v1/courses/:id` | `INSTRUCTOR`, `ADMIN` | Delete a course. A learner JWT receives `403`. |
+
+### Example: Learner Attempting to Delete a Course
+
+```http
+DELETE /api/v1/courses/e8095b21
+Authorization: Bearer <learner-jwt>
+```
+
+```json
+{
+  "statusCode": 403,
+  "error": "Forbidden",
+  "message": "Forbidden resource: Requires one of roles: INSTRUCTOR, ADMIN",
+  "details": null,
+  "timestamp": "2026-09-30T12:00:00.000Z",
+  "correlationId": "8f1a34b2-0008-4444-9999-abcdef123456",
+  "path": "/api/v1/courses/e8095b21"
+}
+```

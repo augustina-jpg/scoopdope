@@ -403,6 +403,14 @@ export class CertificatesService {
     return cert;
   }
 
+  /**
+   * Persists the cached PDF object URL on the certificate row so subsequent
+   * downloads reuse the stored file instead of regenerating it.
+   */
+  async setCertificatePdfUrl(id: string, pdfUrl: string): Promise<void> {
+    await this.certificatesRepository.update({ id }, { pdfUrl });
+  }
+
   async getUserCertificates(userId: string): Promise<Certificate[]> {
     return this.certificatesRepository.find({
       where: { userId },

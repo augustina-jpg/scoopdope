@@ -1,0 +1,39 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Every day at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Dump, encrypt and upload
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Import GPG key
+        run: echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run database backup
+        run: chmod +x scripts/db-backup.sh && ./scripts/db-backup.sh
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GPG_RECIPIENT: ${{ secrets.GPG_RECIPIENT }}
+          S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}

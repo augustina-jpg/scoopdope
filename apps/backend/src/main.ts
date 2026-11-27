@@ -2,6 +2,7 @@ import './tracing';
 import './instrument';
 import * as compression from 'compression';
 import * as express from 'express';
+import * as helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -179,6 +180,34 @@ async function bootstrap() {
   // #1008: Reject request bodies larger than the global limit with 413.
   app.use(express.json({ limit: BODY_SIZE_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
+
+  // #1296: Helmet security headers - CSP, HSTS, X-Frame-Options, etc.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000, // 1 year in seconds
+        includeSubDomains: true,
+        preload: true,
+      },
+      frameguard: { action: 'deny' },
+      noSniff: true,
+      xssFilter: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    }),
+  );
 
   // #1010: ETag support for GET responses (conditional requests → 304).
   app.use(etagMiddleware);

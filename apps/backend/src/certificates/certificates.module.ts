@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CertificatesService } from './certificates.service';
 import { CertificatesController } from './certificates.controller';
 import { CertificatePdfService } from './certificate-pdf.service';
+import { CertificateStorageService } from './certificate-storage.service';
 import { Certificate } from './certificate.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Progress } from '../progress/progress.entity';
@@ -15,7 +16,7 @@ import { StellarModule } from '../stellar/stellar.module';
     TypeOrmModule.forFeature([Certificate, Enrollment, Progress, CourseModule, Lesson]),
     StellarModule,
   ],
-  providers: [CertificatesService, CertificatePdfService],
+  providers: [CertificatesService, CertificatePdfService, CertificateStorageService],
   controllers: [CertificatesController],
   exports: [CertificatesService],
 })

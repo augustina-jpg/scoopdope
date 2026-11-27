@@ -272,5 +272,37 @@ docker compose down       # stop containers
 
 ## Handsoff notes
 
-<!-- handsoff-issue-1281 -->
-- #1281: Implement Rate Limiting on Auth Endpoints
+<!-- handsoff-issue-1009 -->
+- #1009: Nested resource URLs are inconsistent
+<!-- handsoff-issue-984 -->
+- #984: Course completion percentage calculation is incorrect
+
+<!-- handsoff-issue-975 -->
+- #975: BST rewards not rolled back on course unenrollment
+
+<!-- handsoff-issue-977 -->
+- #977: Wallet creation does not store public key in DB
+
+<!-- handsoff-issue-1011 -->
+- #1011: DELETE endpoints return 200 instead of 204
+
+<!-- handsoff-issue-1012 -->
+- #1012: Query parameter injection not sanitized
+
+<!-- handsoff-issue-1025 -->
+- #1025: No database indexes on foreign keys
+
+<!-- handsoff-issue-1334 -->
+- #1334: Implement Bookmarks and Learning Lists
+
+<!-- handsoff-issue-1335 -->
+- #1335: Add Announcement System for Instructors
+
+<!-- handsoff-issue-1336 -->
+- #1336: Implement User Deactivation and Reactivation
+
+<!-- handsoff-issue-1292 -->
+- #1292: Add Idempotency Keys to Payment Endpoints
+
+<!-- handsoff-issue-1313 -->
+- #1313: Implement Assignment Submission and Grading

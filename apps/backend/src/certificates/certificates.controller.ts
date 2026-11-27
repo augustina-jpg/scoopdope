@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { CertificatesService, CertificateVerificationResult } from './certificates.service';
 import { CertificatePdfService } from './certificate-pdf.service';
+import { CertificateStorageService } from './certificate-storage.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -32,6 +33,7 @@ export class CertificatesController {
   constructor(
     private certificatesService: CertificatesService,
     private certificatePdfService: CertificatePdfService,
+    private certificateStorageService: CertificateStorageService,
     private configService: ConfigService,
   ) {}
 
@@ -208,7 +210,19 @@ export class CertificatesController {
   async downloadPdf(@Param('id') id: string): Promise<StreamableFile> {
     const certificate = await this.certificatesService.getCertificateWithRelations(id);
     const baseUrl = this.configService.get<string>('frontend.url') ?? 'http://localhost:3000';
-    const pdf = await this.certificatePdfService.generateCertificatePdf(certificate, baseUrl);
+
+    // Generate once, persist to object storage, and cache the URL on the row so
+    // repeated calls return the same stored file.
+    let pdf: Buffer | null = certificate.pdfUrl
+      ? await this.certificateStorageService.readCertificatePdf(certificate.pdfUrl)
+      : null;
+
+    if (!pdf) {
+      pdf = await this.certificatePdfService.generateCertificatePdf(certificate, baseUrl);
+      const pdfUrl = await this.certificateStorageService.storeCertificatePdf(id, pdf);
+      await this.certificatesService.setCertificatePdfUrl(id, pdfUrl);
+    }
+
     return new StreamableFile(pdf, {
       disposition: `attachment; filename="certificate-${id}.pdf"`,
       type: 'application/pdf',

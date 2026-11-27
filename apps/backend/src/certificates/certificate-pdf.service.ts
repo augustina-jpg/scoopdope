@@ -30,6 +30,7 @@ export class CertificatePdfService {
       verificationUrl,
       qrPng,
       certificateId: certificate.id,
+      certificateHash: certificate.certificateHash,
     });
   }
 
@@ -42,6 +43,7 @@ export class CertificatePdfService {
     verificationUrl: string;
     qrPng: Buffer;
     certificateId: string;
+    certificateHash: string;
   }): Buffer {
     const {
       studentName,
@@ -52,6 +54,7 @@ export class CertificatePdfService {
       verificationUrl,
       qrPng,
       certificateId,
+      certificateHash,
     } = data;
 
     const esc = (v: string) =>
@@ -75,6 +78,7 @@ export class CertificatePdfService {
           issuedAt,
           verificationUrl,
           certificateId,
+          certificateHash,
           W,
           H,
           qrX,
@@ -104,7 +108,8 @@ export class CertificatePdfService {
           // Meta
           `BT /F1 11 Tf 0.3 0.3 0.3 rg 60 ${H - 310} Td (Date Issued: ${esc(issuedAt)}) Tj ET`,
           `BT /F1 9 Tf 0.5 0.5 0.5 rg 60 ${H - 330} Td (Certificate ID: ${esc(certificateId)}) Tj ET`,
-          `BT /F1 9 Tf 0.5 0.5 0.5 rg 60 ${H - 350} Td (Verify at: ${esc(verificationUrl)}) Tj ET`,
+          `BT /F1 9 Tf 0.5 0.5 0.5 rg 60 ${H - 350} Td (Credential Hash: ${esc(certificateHash)}) Tj ET`,
+          `BT /F1 9 Tf 0.5 0.5 0.5 rg 60 ${H - 368} Td (Verify at: ${esc(verificationUrl)}) Tj ET`,
           // QR label
           `BT /F1 9 Tf 0.3 0.3 0.3 rg ${qrX} ${qrY + qrH + 8} Td (Scan to verify on-chain) Tj ET`,
           // Draw QR image
@@ -183,6 +188,7 @@ export class CertificatePdfService {
     issuedAt: string;
     verificationUrl: string;
     certificateId: string;
+    certificateHash: string;
     W: number;
     H: number;
     qrX: number;
@@ -197,6 +203,7 @@ export class CertificatePdfService {
       issuedAt,
       verificationUrl,
       certificateId,
+      certificateHash,
       W,
       H,
       qrX,
@@ -229,7 +236,8 @@ export class CertificatePdfService {
       // Meta
       `BT /F1 11 Tf 0.85 0.85 0.85 rg 60 ${H - 310} Td (Date Issued: ${esc(issuedAt)}) Tj ET`,
       `BT /F1 9 Tf 0.6 0.6 0.6 rg 60 ${H - 330} Td (Certificate ID: ${esc(certificateId)}) Tj ET`,
-      `BT /F1 9 Tf 0.6 0.6 0.6 rg 60 ${H - 350} Td (Verify at: ${esc(verificationUrl)}) Tj ET`,
+      `BT /F1 9 Tf 0.6 0.6 0.6 rg 60 ${H - 350} Td (Credential Hash: ${esc(certificateHash)}) Tj ET`,
+      `BT /F1 9 Tf 0.6 0.6 0.6 rg 60 ${H - 368} Td (Verify at: ${esc(verificationUrl)}) Tj ET`,
       // QR label
       `BT /F1 9 Tf 0.85 0.85 0.85 rg ${qrX} ${qrY + qrH + 8} Td (Scan to verify on-chain) Tj ET`,
       // Draw QR image

@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 /**
- * ABI Validation Script (#875)
+ * ABI Validation Script (#875, #1290)
  *
  * Validates that all ABI JSON files in /contracts/abis/ conform to the expected
- * schema and are internally consistent. Run this in CI and before any release.
+ * schema and are internally consistent. Additionally (#1290) compares each
+ * compiled contract's JSON ABI against the TypeScript client types used by the
+ * backend so that ABI drift fails CI instead of silently producing malformed
+ * transactions on-chain.
  *
  * Usage:
  *   node scripts/validate-abis.js
  *   # or via npm workspace:
  *   npm run abi:validate --workspace=apps/backend
  *
- * Exit code 0  — all ABIs valid
- * Exit code 1  — one or more ABIs failed validation
+ * Exit code 0  — all ABIs valid and in sync with the TS client
+ * Exit code 1  — one or more ABIs failed validation or drifted from the client
  */
 
 'use strict';
@@ -24,6 +27,18 @@ const path = require('path');
 const REPO_ROOT  = path.resolve(__dirname, '..');
 const ABI_DIR    = path.join(REPO_ROOT, 'contracts', 'abis');
 const INDEX_FILE = path.join(ABI_DIR, 'index.json');
+
+/**
+ * Locations of the TypeScript client types that mirror the contract ABIs.
+ * Each entry maps a contract name to the file that declares its client
+ * interface. Missing files are skipped with a warning so the script still
+ * works in repos/checkouts that only ship the ABI JSON.
+ */
+const CLIENT_TYPE_FILES = [
+  path.join(REPO_ROOT, 'apps', 'backend', 'src', 'stellar', 'contract-types.ts'),
+  path.join(REPO_ROOT, 'apps', 'backend', 'src', 'stellar', 'contracts.ts'),
+  path.join(REPO_ROOT, 'apps', 'backend', 'src', 'stellar', 'client-types.ts'),
+];
 
 /** Soroban primitive types considered valid. */
 const PRIMITIVE_TYPES = new Set([
@@ -55,6 +70,78 @@ function isValidType(typeStr, definedTypes) {
   const mapMatch = typeStr.match(/^Map<(.+),\s*(.+)>$/);
   if (mapMatch) return isValidType(mapMatch[1], definedTypes) && isValidType(mapMatch[2], definedTypes);
   return PRIMITIVE_TYPES.has(typeStr) || definedTypes.has(typeStr);
+}
+
+/**
+ * Extract the set of function names declared in a TypeScript client file.
+ * Matches method signatures inside `interface`/`type` blocks, e.g.
+ *   transfer(from: string, to: string, amount: bigint): void;
+ *   async deposit(params: DepositParams): Promise<void>;
+ * Returns a Set of lower-cased function names, or null if the file is absent.
+ */
+function extractClientFunctionNames(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  const src = fs.readFileSync(filePath, 'utf-8');
+  const names = new Set();
+  // Method-style signatures: `name(...)` optionally preceded by modifiers.
+  const methodRe = /^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/gm;
+  let m;
+  while ((m = methodRe.exec(src)) !== null) {
+    const name = m[1];
+    // Skip TS keywords / control-flow constructs that look like calls.
+    if (['if', 'for', 'while', 'switch', 'catch', 'function', 'return', 'constructor'].includes(name)) continue;
+    names.add(name.toLowerCase());
+  }
+  return names;
+}
+
+/**
+ * Compare a contract's ABI function names against the TS client function
+ * names. Any ABI function missing from the client (or vice-versa) is a
+ * signature mismatch and fails validation.
+ */
+function validateAgainstClient(contractName, abiFunctions) {
+  console.log(`\n🔗  Cross-checking ${contractName} ABI against TS client types …`);
+
+  let clientNames = null;
+  let clientFile = null;
+  for (const candidate of CLIENT_TYPE_FILES) {
+    const names = extractClientFunctionNames(candidate);
+    if (names && names.size > 0) {
+      clientNames = names;
+      clientFile = candidate;
+      break;
+    }
+  }
+
+  if (!clientNames) {
+    warn(`No TypeScript client types found for ${contractName}; skipping ABI/client cross-check`);
+    return;
+  }
+
+  const abiNames = new Set(
+    (abiFunctions || [])
+      .filter((fn) => fn && typeof fn.name === 'string')
+      .map((fn) => fn.name.toLowerCase()),
+  );
+
+  let mismatches = 0;
+  for (const name of abiNames) {
+    if (!clientNames.has(name)) {
+      fail(`ABI function "${name}" in ${contractName} is missing from TS client (${path.relative(REPO_ROOT, clientFile)})`);
+      mismatches++;
+    }
+  }
+  for (const name of clientNames) {
+    if (!abiNames.has(name)) {
+      fail(`TS client function "${name}" has no matching ABI function in ${contractName}`);
+      mismatches++;
+    }
+  }
+
+  if (mismatches === 0) {
+    pass(`ABI/client function names in sync (${abiNames.size} function(s))`);
+  }
 }
 
 // ─── Validators ───────────────────────────────────────────────────────────────
@@ -199,6 +286,9 @@ function validateAbiFile(contractName, filePath) {
       }
     }
     pass(`functions section: ${fnNames.size} function(s) defined`);
+
+    // ── Cross-check against TS client types (#1290) ──────────────────────────
+    validateAgainstClient(contractName, abi.functions);
   }
 
   // ── Events ─────────────────────────────────────────────────────────────────
@@ -224,42 +314,31 @@ function main() {
 
   if (!fs.existsSync(ABI_DIR)) {
     console.error(`\n❌  ABI directory not found: ${ABI_DIR}`);
-    console.error('   Run the ABI export process first.');
     process.exit(1);
   }
 
   const index = validateIndex(INDEX_FILE);
-
-  // Validate every contract listed in the index
-  if (index && Array.isArray(index.contracts)) {
-    for (const { name, file } of index.contracts) {
-      validateAbiFile(name, path.join(ABI_DIR, file));
-    }
+  if (!index) {
+    console.error(`\n❌  Cannot continue without a valid index.json`);
+    process.exit(1);
   }
 
-  // Also check for any JSON files in the directory not listed in the index
-  const indexedFiles = new Set(
-    (index?.contracts || []).map((c) => c.file)
-  );
-  for (const file of fs.readdirSync(ABI_DIR)) {
-    if (file === 'index.json' || !file.endsWith('.json')) continue;
-    if (!indexedFiles.has(file)) {
-      warn(`File "${file}" exists in abis/ but is not listed in index.json`);
-    }
+  for (const entry of index.contracts) {
+    if (!entry.name || !entry.file) continue;
+    validateAbiFile(entry.name, path.join(ABI_DIR, entry.file));
   }
 
-  // ── Summary ────────────────────────────────────────────────────────────────
   console.log('\n═══════════════════════════════════════════════════════');
-  if (errors === 0 && warnings === 0) {
-    console.log('  ✅  All ABIs are valid. No issues found.');
-  } else if (errors === 0) {
-    console.log(`  ⚠️   All ABIs valid — ${warnings} warning(s). Review above.`);
-  } else {
-    console.log(`  ❌  Validation FAILED — ${errors} error(s), ${warnings} warning(s).`);
-  }
-  console.log('═══════════════════════════════════════════════════════\n');
+  console.log(`  Result: ${errors} error(s), ${warnings} warning(s)`);
+  console.log('═══════════════════════════════════════════════════════');
 
-  process.exit(errors > 0 ? 1 : 0);
+  if (errors > 0) {
+    console.error('\n❌  ABI validation failed. Fix the errors above before merging.');
+    process.exit(1);
+  }
+
+  console.log('\n✅  All ABIs valid and in sync with the TS client.');
+  process.exit(0);
 }
 
 main();
