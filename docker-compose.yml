@@ -14,6 +14,11 @@ services:
       - '5432:5432'
     networks:
       - scoopdope
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U scoopdope -d scoopdope']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -24,6 +29,11 @@ services:
       - '6379:6379'
     networks:
       - scoopdope
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   elasticsearch:
     image: elasticsearch:8.12.0
@@ -68,7 +78,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       elasticsearch:
         condition: service_healthy
     networks:
@@ -91,4 +101,3 @@ networks:
   scoopdope:
     name: scoopdope
     driver: bridge
-
