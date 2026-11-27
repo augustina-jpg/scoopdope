@@ -44,7 +44,7 @@ jobs:
           cp apps/backend/openapi.json docs/api/dist/openapi.json
           cp docs/api/swagger-ui.html docs/api/dist/index.html
 
-      - uses: actions/configure-pages@v4
+      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v3
         with:
